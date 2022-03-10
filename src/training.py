@@ -1,7 +1,11 @@
 from random import shuffle
-from sklearn.model_selection import KFold,GroupKFold
+from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
+from src import config
 
-def define_cvfolds(df, no_folds, SEED:int, group:str=None):
+
+
+def define_cvfolds(df, no_folds, SEED:int, 
+                   group:str=None, strata:str=None):
     """
     Define cv folds and save in the dataframe.
     
@@ -30,8 +34,14 @@ def define_cvfolds(df, no_folds, SEED:int, group:str=None):
     
     if group is not None:
         cv = GroupKFold(n_splits=no_folds)
+    elif strata is not None:
+        cv = StratifiedKFold(n_splits=no_folds, 
+                             random_state=config.RANDOM_SEED, 
+                             shuffle=True)
     else:
-        cv = KFold(n_splits=no_folds, shuffle=True, random_state=SEED)
+        cv = KFold(n_splits=no_folds, 
+                   shuffle=True, 
+                   random_state=SEED)
     
     X = df.drop(['target_single'], axis=1).copy()
     y = df['target_single']
@@ -41,3 +51,10 @@ def define_cvfolds(df, no_folds, SEED:int, group:str=None):
         df.loc[v_, 'kfold'] = fold
         
     return df
+
+
+
+def train():
+    """
+    Training pipeline - tabular
+    """

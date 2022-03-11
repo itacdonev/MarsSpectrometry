@@ -1,6 +1,6 @@
 """Preprocess the data"""
 
-from sklearn.preprocess import minmax_scale
+from sklearn.preprocessing import minmax_scale
 
 def preprocess_ion_type(df):
     """

@@ -1,8 +1,12 @@
 from random import shuffle
 from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import log_loss
+from termcolor import colored
 from src import config
 
-
+import numpy as np
+import pandas as pd
 
 def define_cvfolds(df, no_folds, SEED:int, 
                    group:str=None, strata:str=None):
@@ -54,7 +58,89 @@ def define_cvfolds(df, no_folds, SEED:int,
 
 
 
-def train():
+def trainCV(X, df_y, 
+            target:list, 
+            cv_folds:str,
+            model_metric):
     """
-    Training pipeline - tabular
+    Training pipeline 
+        - tabular one target label at a time
+        - SKF for each label target
+    
+    Parameters
+    ----------
+        X: pandas data frame
+            Input datatable for training.
+            
+        df_y: pandas data frame
+            Input labels for training
+        
+        features: list
+            List of features to train on.
+        
+        target: list
+            List of target columns
+            
+        cv_folds: int
+            Number of CV folds to split the sample.            
+        
+        model_metric
+            Define model metric to be used for training.
+            
+            
+    Returns
+    -------
+        
+            
     """
+    
+    # Get label names
+    label_names = df_y[target]
+    
+    # MODEL INFORMATION
+    logloss = {}    # Average value of log loss for each label
+    
+    for label in label_names: 
+        print(colored(f'\nLABEL: {label}', 'blue'))
+        # Select one label   
+        y = df_y[label].copy()
+        
+        # Define cross validation
+        cv = StratifiedKFold(n_splits = cv_folds,
+                             random_state =config.RANDOM_SEED,
+                             shuffle = True)
+        
+        # CROSS VALIDATION TRAINING
+        oof_logloss = [] # Metric for each fold for one label
+        
+        # Define the folds and train the model
+        for fold, (t_, v_) in enumerate(cv.split(X, y)):
+            print(colored(f'Training for FOLD = {fold + 1}', 'blue'))
+            X_train = X.iloc[t_].reset_index(drop=True)
+            y_train = y.iloc[t_].values
+            X_valid = X.iloc[v_].reset_index(drop=True)
+            y_valid = y.iloc[v_].values
+            #print(colored(f'X_train={X_train.shape}, y_train={y_train.shape}', 'magenta'))
+            #print(colored(f'X_valid={X_valid.shape}, y_valid={y_valid.shape}', 'magenta'))
+            print(f'Event rate (TRAIN) = {np.round(y_train.sum()/y_train.shape[0],2)}%')
+            print(f'Event rate (VALID) = {np.round(y_valid.sum()/y_valid.shape[0],2)}%')
+            
+            # Initialize the classifier
+            clf = LogisticRegression(penalty="l1", 
+                                     solver="liblinear", 
+                                     C=10, 
+                                     random_state=config.RANDOM_SEED)
+            
+            # Traing the model
+            clf.fit(X_train, y_train)
+            
+            # Compute predictions
+            y_preds = clf.predict_proba(X_valid)[:,1]
+            
+            # Compute model metric
+            oof_logloss.append(log_loss(y_valid, y_preds))
+        
+        # Average log loss per label
+        logloss[label] = np.sum(oof_logloss)/cv_folds
+
+    return logloss

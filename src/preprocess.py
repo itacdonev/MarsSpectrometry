@@ -6,11 +6,12 @@ import pandas as pd
 
 
 
-def get_sample(df_meta, i):
+def get_sample(df_meta, i, verbose:bool=False):
     """Load one sample."""
     sample_file = df_meta.iloc[i]['features_path']
     sample_name = df_meta.iloc[i]['sample_id']
-    print(f'Sample ID: {sample_name}')
+    if verbose:
+        print(f'Sample ID: {sample_name}')
     df = pd.read_csv(config.DATA_DIR + sample_file)
     
     return df

@@ -1,8 +1,7 @@
 """Feature engineering"""
 
 import pandas as pd
-
-
+from src import preprocess
 
 
 # Compute average abundance for each sample
@@ -16,15 +15,29 @@ def compute_avg_abundance_ion(df_sample, sample_name:str):
 
 
 # Features are ions
-def ion_avg_abundance():
+def ion_avg_abundance(df_meta):
     """Compute avergae abundance for each ion in the sample
     """
     
     # Initialize a table to store computed values
     dt = pd.DataFrame(dtype='float64')
     
-    # Compute average abundance for each sample
     
+    # Loop over all sample_id and compute. Add computation to dt.
+    sample_list = df_meta[df_meta.split == 'train']['sample_id'].to_list()
+    print(f'Number of samples: {len(sample_list)}')
     
-    
+    for i, sample in enumerate(sample_list):
+        
+        df_sample = preprocess.get_sample(df_meta, i)
+        
+        # Preprocess data sample
+        df_sample = preprocess.preprocess_samples(df_sample)
+        
+        # Compute average abundance for each sample
+        dt_avg_abund = compute_avg_abundance_ion(df_sample, sample_name=sample)
+        
+        # Add computed values back to original data frame
+        dt = pd.concat([dt, dt_avg_abund], ignore_index=True)
+        
     return dt

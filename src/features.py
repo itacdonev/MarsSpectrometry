@@ -1,7 +1,7 @@
 """Feature engineering"""
 
 import pandas as pd
-from src import preprocess
+from src import config, preprocess
 
 
 # Compute average abundance for each sample
@@ -41,3 +41,15 @@ def ion_avg_abundance(df_meta):
         dt = pd.concat([dt, dt_avg_abund], ignore_index=True)
         
     return dt
+
+
+def avg_temp_sample(df, df_files):
+    # Average temperature per sample
+    avg_temp_sample = {}
+    for i in df_files:
+        df = pd.read_csv(config.DATA_DIR + df_files[i])
+        avg_temp_sample[i] = df.temp.mean()
+        
+    df['avg_temp'] = df.index.map(avg_temp_sample)
+    
+    return df

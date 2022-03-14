@@ -83,7 +83,8 @@ def preprocess_samples(df):
 
 def compute_min_max_temp_ion(metadata):
     """
-    Compute min and max temperature for all samples
+    Compute min and max temperature for all samples.
+    Compute unique values for the ion type.
     """
     min_temp = 0
     max_temp = 0

@@ -1,14 +1,12 @@
-from random import shuffle
-from tabnanny import verbose
-from turtle import mode
 from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import log_loss
+from sklearn.preprocessing import LabelEncoder
 from termcolor import colored
 from src import config
 
 import numpy as np
 import pandas as pd
+
+
 
 def define_cvfolds(df, no_folds, SEED:int, 
                    group:str=None, strata:str=None):
@@ -110,7 +108,7 @@ def trainCV_label(X, df_y,
     logloss = {}    # Average value of log loss for each label
     
     for label in label_names: 
-        print(colored(f'\nLABEL: {label}', 'blue'))
+        #print(colored(f'\nLABEL: {label}', 'blue'))
         # Select one label   
         y = df_y[label].copy()
         
@@ -124,9 +122,9 @@ def trainCV_label(X, df_y,
         
         # Define the folds and train the model
         for fold, (t_, v_) in enumerate(cv.split(X, y)):
-            X_train = X.iloc[t_]
+            X_train = X.iloc[t_].copy()
             y_train = y.iloc[t_].values
-            X_valid = X.iloc[v_]
+            X_valid = X.iloc[v_].copy()
             y_valid = y.iloc[v_].values
             if verbose:
                 print(colored(f'Training for FOLD = {fold + 1}', 'blue'))
@@ -135,6 +133,10 @@ def trainCV_label(X, df_y,
                 print(f'Event rate (TRAIN) = {np.round(y_train.sum()/y_train.shape[0],2)}%')
                 print(f'Event rate (VALID) = {np.round(y_valid.sum()/y_valid.shape[0],2)}%')
             
+            #le = LabelEncoder()
+            #X_train['instrument_type'] = le.fit_transform(X_train['instrument_type'])
+            #X_valid['instrument_type'] = le.transform(X_valid['instrument_type'])
+    
             # Traing the model
             clf.fit(X_train, y_train)
             

@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 
 def get_sample(df_meta, i, verbose:bool=False):
-    """Load one sample."""
+    """Load one sample"""
     sample_file = df_meta.iloc[i]['features_path']
     sample_name = df_meta.iloc[i]['sample_id']
     if verbose:
@@ -17,24 +17,6 @@ def get_sample(df_meta, i, verbose:bool=False):
     return df
 
 
-def compute_min_max_temp(metadata):
-    """
-    Compute min and max temperature for all samples
-    """
-    min_temp = 0
-    max_temp = 0
-
-    for i in tqdm(range(metadata.shape[0])):
-        df_sample = preprocess.get_sample(metadata, i)
-        if df_sample.temp.min() < min_temp:
-            min_temp = df_sample.temp.min()
-        if df_sample.temp.max() > max_temp:
-            max_temp = df_sample.temp.max()
-        
-    print(f'Min temp = {min_temp}; Max temp = {max_temp}')
-    return min_temp, max_temp
-
-    
 def preprocess_ion_type(df):
     """
     Preprocess sample observations.
@@ -97,3 +79,35 @@ def preprocess_samples(df):
     df = scale_abun(df)
     
     return df
+
+
+def compute_min_max_temp_ion(metadata):
+    """
+    Compute min and max temperature for all samples
+    """
+    min_temp = 0
+    max_temp = 0
+    ion_list = []
+    
+    for i in tqdm(range(metadata.shape[0])):
+        # Load the sample
+        df_sample = preprocess.get_sample(metadata, i)
+        
+        # Preprocess the sample data
+        df_sample = preprocess_samples(df_sample)
+        
+        # Get the temp values
+        if df_sample.temp.min() < min_temp:
+            min_temp = df_sample.temp.min()
+        if df_sample.temp.max() > max_temp:
+            max_temp = df_sample.temp.max()
+        
+        # Get ion values
+        sample_ions = df_sample['m/z'].unique()
+        diff_ions = list(set(sample_ions).difference(set(ion_list)))
+        if len(diff_ions) > 0:
+            ion_list += diff_ions
+        
+    return min_temp, max_temp, ion_list
+
+    

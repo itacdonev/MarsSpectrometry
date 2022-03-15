@@ -1,10 +1,11 @@
 """Feature engineering"""
 
+from importlib.metadata import metadata
 import pandas as pd
 import numpy as np
 from src import config, preprocess
 from tqdm import tqdm
-
+import gc
 
 
 # BENCHMARK FEATURES
@@ -70,7 +71,55 @@ def features_iontemp_abun(df_meta, sample_list):
     dt.columns = t_cols
 
     return dt
+     
+
+# ===== Duration to max temperature per ion =====
+def ion_duration_maxtemp(df_sample, ion_list):
+    
+    # Preprocess the sample data
+    df_sample = preprocess.preprocess_samples(df_sample)
+
+    # Initialize dictionary
+    ion_time_dict = {}
+    
+    for i in ion_list:
+        # Compute only for ions present in the sample
+        if i in df_sample['m/z'].unique():
+            # Select the ion type
+            ht = df_sample[df_sample['m/z'] == i].copy()
+            ion_time_dict[i] = ht[ht.abun_minsub_scaled == max(ht.abun_minsub_scaled)]['time'].iloc[0]
+        else:
+            ion_time_dict[i] = np.nan
+    
+    return ion_time_dict
+    
+def features_ion_duration_maxtemp(df_meta, file_paths, ion_list):
+    
+    # Data frame to save results
+    fts_df = pd.DataFrame(data = {'m/z': np.arange(0,100,1.)}, 
+                          dtype='float')
+    
+    for i in tqdm(file_paths):
+        # Get sample
+        df_sample = preprocess.get_sample(df_meta, i)
+        sample_name = df_meta.loc[i, 'sample_id']
         
+        # Compute duration to max abundance
+        duration_max_abund = ion_duration_maxtemp(df_sample, ion_list)
+    
+        # Append values to data frame
+        fts_df[sample_name] = fts_df['m/z'].map(duration_max_abund)
+        gc.collect()
+        
+    # Transpose the data frame
+    df = fts_df.iloc[:,1:].T
+    df.columns = fts_df['m/z'].astype('str')
+    df = df.add_prefix('Ion_')
+    del df['Ion_4.0']
+    
+    return df
+        
+    
 # === TARGET ENCODING ===
 
 

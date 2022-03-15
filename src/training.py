@@ -3,7 +3,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from termcolor import colored
 from src import config
-
+import xgboost as xgb
 import numpy as np
 import pandas as pd
 
@@ -109,7 +109,9 @@ def trainCV_label(X, df_y,
     logloss = {}    # Average value of log loss for each label
     
     for label in label_names: 
-        print(colored(f'\nLABEL: {label}', 'blue'))
+        if verbose:
+            print(colored(f'\nLABEL: {label}', 'blue'))
+        
         # Select one label   
         y = df_y[label].copy()
         
@@ -158,9 +160,11 @@ def trainCV_label(X, df_y,
 
 
 
-def train_full_model(X, df_y, target:list):
+def train_full_model(X, df_y, target:list, model_algo:str):
     """
     Train full model
+    
+    model_algo: 'LR', 'XGB'
     """
     # Get label names
     label_names = df_y[target]
@@ -173,8 +177,14 @@ def train_full_model(X, df_y, target:list):
         y = df_y[label].copy().values
         
         # Traing the model
-        clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
-                                 random_state=config.RANDOM_SEED)
+        if model_algo == 'LR':
+            clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
+                                    random_state=config.RANDOM_SEED)
+        elif model_algo == 'XGB':
+            clf = clf = xgb.XGBClassifier(objective = "binary:logistic",
+                                          use_label_encoder = False,
+                                          eval_metric = 'logloss')
+            
         clf_fitted_dict[label] = clf.fit(X, y)
         
     return clf_fitted_dict

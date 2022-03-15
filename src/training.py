@@ -1,5 +1,6 @@
 from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
+from sklearn.linear_model import LogisticRegression
 from termcolor import colored
 from src import config
 
@@ -108,7 +109,7 @@ def trainCV_label(X, df_y,
     logloss = {}    # Average value of log loss for each label
     
     for label in label_names: 
-        #print(colored(f'\nLABEL: {label}', 'blue'))
+        print(colored(f'\nLABEL: {label}', 'blue'))
         # Select one label   
         y = df_y[label].copy()
         
@@ -154,3 +155,27 @@ def trainCV_label(X, df_y,
         print(logloss)
             
     return logloss
+
+
+
+def train_full_model(X, df_y, target:list):
+    """
+    Train full model
+    """
+    # Get label names
+    label_names = df_y[target]
+    clf_fitted_dict = {}
+    
+    for label in label_names: 
+        
+        # Select one label   
+        #print(colored(f'LABEL: {label}', 'blue'))
+        y = df_y[label].copy().values
+        
+        # Traing the model
+        clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
+                                 random_state=config.RANDOM_SEED)
+        clf_fitted_dict[label] = clf.fit(X, y)
+        
+    return clf_fitted_dict
+

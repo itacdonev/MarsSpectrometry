@@ -1,6 +1,7 @@
 """Feature engineering"""
 
 
+from importlib.metadata import metadata
 import pandas as pd
 import numpy as np
 from src import config, preprocess
@@ -169,25 +170,26 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
             peak_time, peak_temp, peak_abund = 0, 0, 0
             
         # Compute AUC
-        if not temp_dt.empty:
-            area_abund = np.round(auc(temp_dt['temp'],temp_dt['abun_minsub_scaled']),5)
-        else: area_abund = 0
+        #TODO Needs further discussion
+        #if not temp_dt.empty:
+        #    area_abund = np.round(auc(temp_dt['temp'],temp_dt['abun_minsub_scaled']),5)
+        #else: area_abund = 0
         
         # Add values
         ion_peaks_info.append(peak_time)
         ion_peaks_info.append(peak_temp)
         ion_peaks_info.append(peak_abund)
-        ion_peaks_info.append(area_abund)
+        #ion_peaks_info.append(area_abund)
             
         ion_peaks_cnt[ion] = ion_peaks_info
         
     #-------------------
     # CONVERT DICT TO DF
     # Define new column names
-    new_cols = ['m/z','peak_cnt', 'peak_time', 'peak_temp', 'peak_abund', 'abund_area']
+    new_cols = ['m/z','peak_cnt', 'peak_time', 'peak_temp', 'peak_abund']
     
     # Save dict as data frame and transpose
-    ion_peaks_stats = pd.DataFrame(ion_peaks_cnt)
+    ion_peaks_stats = pd.DataFrame(ion_peaks_cnt, dtype='float64')
     ion_peaks_stats = ion_peaks_stats.T
     ion_peaks_stats.reset_index(inplace=True)
     ion_peaks_stats.columns = new_cols
@@ -201,13 +203,20 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
 
 
 # Concat all samples together
-def features_ion_peaks():
+# Loop over all files compute peaks and concat together
+def features_ion_peaks(file_paths:dict, metadata, ion_list:list):
     """
     Combines all computed ion peaks stats from each sample
     into a features data frame.
     """
-    pass
-
+    # Initialize a data frame to store all the sample calculations
+    df = pd.DataFrame()
+    
+    for sample_idx in tqdm(file_paths):
+        ion_peaks_df = compute_ion_peaks(metadata, sample_idx, ion_list)
+        df = pd.concat([df,ion_peaks_df], axis = 0)
+    
+    return df
 
     
 # === TARGET ENCODING ===

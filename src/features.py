@@ -1,9 +1,12 @@
 """Feature engineering"""
 
-from importlib.metadata import metadata
+
 import pandas as pd
 import numpy as np
 from src import config, preprocess
+from scipy.signal import find_peaks
+from scipy.ndimage.filters import gaussian_filter1d
+from sklearn.metrics import auc
 from tqdm import tqdm
 import gc
 
@@ -119,6 +122,93 @@ def features_ion_duration_maxtemp(df_meta, file_paths, ion_list):
     
     return df
         
+
+# ===== FIND PEAKS =====
+def compute_ion_peaks(metadata, sample_idx, ion_list):
+    
+    # Select a sample and get sample name
+    df_sample = preprocess.get_sample(metadata, sample_idx)
+    sample_name = metadata.iloc[sample_idx]['sample_id']
+    
+    # Preprocess the sample
+    df_sample = preprocess.preprocess_samples(df_sample)
+    
+    # Compute stats and save in dict for each ion type
+    ion_peaks_cnt = {} # Initialize dictionary to save calculated values
+    for ion in ion_list:
+        ion_peaks_info = [] # initialize list to store stats per ion type
+        
+        temp_dt = df_sample[df_sample['m/z'] == ion].copy()
+        
+        # Apply Gaussian filter for the values
+        temp_dt['abun_minsub_scaled_filtered'] = gaussian_filter1d(temp_dt['abun_minsub_scaled'], 
+                                                                sigma=4)
+        
+        # Compute the median for the prominence ("the minimum height necessary 
+        # to descend to get from the summit to any higher terrain")
+        med = temp_dt['abun_minsub_scaled_filtered'].median()
+        
+        # Find peaks
+        peaks, _ = find_peaks(temp_dt['abun_minsub_scaled_filtered'], prominence=med)
+        ion_peaks_info.append(len(peaks))
+        
+        # Peak statistics
+        peak_temp = []
+        peak_time = []
+        peak_abund = []
+        for i in peaks:
+            tm = temp_dt.iloc[i]['time']; peak_time.append(tm) 
+            t = temp_dt.iloc[i]['temp']; peak_temp.append(t)
+            a = temp_dt.iloc[i]['abun_minsub_scaled']; peak_abund.append(a)
+        
+        if len(peak_time)>0 and len(peak_temp)>0 and len(peak_abund)>0:
+            peak_time = max(peak_time)
+            peak_temp = max(peak_temp)
+            peak_abund = max(peak_abund)
+        else: 
+            peak_time, peak_temp, peak_abund = 0, 0, 0
+            
+        # Compute AUC
+        if not temp_dt.empty:
+            area_abund = np.round(auc(temp_dt['temp'],temp_dt['abun_minsub_scaled']),5)
+        else: area_abund = 0
+        
+        # Add values
+        ion_peaks_info.append(peak_time)
+        ion_peaks_info.append(peak_temp)
+        ion_peaks_info.append(peak_abund)
+        ion_peaks_info.append(area_abund)
+            
+        ion_peaks_cnt[ion] = ion_peaks_info
+        
+    #-------------------
+    # CONVERT DICT TO DF
+    # Define new column names
+    new_cols = ['m/z','peak_cnt', 'peak_time', 'peak_temp', 'peak_abund', 'abund_area']
+    
+    # Save dict as data frame and transpose
+    ion_peaks_stats = pd.DataFrame(ion_peaks_cnt)
+    ion_peaks_stats = ion_peaks_stats.T
+    ion_peaks_stats.reset_index(inplace=True)
+    ion_peaks_stats.columns = new_cols
+    ion_peaks_stats['sample_id'] = sample_name
+    
+    #-----------------------------------------
+    # CREATE PIVOT FROM DF FOR FEATURE COLUMNS
+    df = ion_peaks_stats.pivot(index='sample_id', columns="m/z")
+    
+    return df
+
+
+# Concat all samples together
+def features_ion_peaks():
+    """
+    Combines all computed ion peaks stats from each sample
+    into a features data frame.
+    """
+    pass
+
+
     
 # === TARGET ENCODING ===
 

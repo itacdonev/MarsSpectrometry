@@ -216,6 +216,9 @@ def features_ion_peaks(file_paths:dict, metadata, ion_list:list):
         ion_peaks_df = compute_ion_peaks(metadata, sample_idx, ion_list)
         df = pd.concat([df,ion_peaks_df], axis = 0)
     
+    # Join multi column index into one separated by -
+    df.columns = df.columns.map(lambda x: '_'.join([str(i) for i in x]))
+    
     return df
 
     

@@ -48,6 +48,7 @@ def remove_background_abundance(df):
     df["abundance_minsub"] = df.groupby(["m/z"])["abundance"].transform(
         lambda x: (x - x.min())
     )
+    del df['abundance']
 
     return df
 
@@ -65,6 +66,8 @@ def scale_abun(df):
 
     df["abun_minsub_scaled"] = minmax_scale(df["abundance_minsub"].astype(float))
 
+    del df['abundance_minsub']
+    
     return df
 
 

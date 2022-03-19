@@ -111,4 +111,23 @@ def compute_min_max_temp_ion(metadata):
         
     return min_temp, max_temp, ion_list
 
+def compute_max_time_samples(metadata):
+    """
+    Compute maximum time across all samples in
+    training, validation and test sets.
+    """
     
+    max_time = 0
+    
+    for i in tqdm(range(metadata.shape[0])):
+        # Load the sample
+        df_sample = preprocess.get_sample(metadata, i)
+        df_sample = preprocess.preprocess_samples(df_sample)
+        
+        # Compute maximum time within the sample
+        tm = df_sample.time.max()
+        
+        if tm > max_time:
+            max_time = tm
+            
+    return max_time

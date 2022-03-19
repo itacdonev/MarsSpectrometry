@@ -2,9 +2,10 @@
 
 
 from importlib.metadata import metadata
+from operator import index
 import pandas as pd
 import numpy as np
-from src import config, preprocess
+from src import config, preprocess, utils
 from scipy.signal import find_peaks
 from scipy.ndimage.filters import gaussian_filter1d
 from sklearn.metrics import auc
@@ -221,7 +222,46 @@ def features_ion_peaks(file_paths:dict, metadata, ion_list:list):
     
     return df
 
+
+# ===== DEEP LEARNING =====
+def dl_time_pivot(metadata, n_sample, max_time):
+    """
+    Process the time series of a sample to create a df
+    where each row is a  distinct time. Columns represent
+    features given the m/z value.
+    """
     
+    # Data frame to store the final processed - all samples (by row)
+    df = pd.DataFrame()
+    
+    # ----- SAMPLE PROCESSING -----
+    # Load and preprocess the sample
+    df_sample = preprocess.get_sample(metadata, n_sample)
+    df_sample = preprocess.preprocess_samples(df_sample)
+    
+    # Define the time range
+    time_range = pd.interval_range(start=0.0, 
+                               end=utils.roundup(max_time), 
+                               freq=10, 
+                               closed='left')
+    
+    # Map the time into bins
+    df_sample['time_bin'] = pd.cut(df_sample['time'], bins=time_range)
+    del df_sample['time']
+    
+    # Make a pivot table
+    df_pivot = df_sample.pivot(index=['time_bin', 'temp'],
+                               columns='m/z', 
+                               values='abun_minsub_scaled')
+    
+    df_pivot = df_pivot.add_prefix('mz_')
+    df_pivot.columns = [i.removesuffix('.0') for i in df_pivot.columns]
+    df_pivot = df_pivot.add_suffix('_abund')
+    
+    return df_pivot
+    
+    
+
 # === TARGET ENCODING ===
 
 

@@ -254,15 +254,13 @@ def dl_time_pivot(metadata, n_sample, max_time):
     
     # Aggregate features based on the time_bin, temp and m/z
     # Solves the problem of several measurement within the interval range
-    df_sample['abun_agg'] = df_sample.groupby(['time_bin', 'temp', 'm/z'])['abun_minsub_scaled']\
-            .transform('mean')
-    del df_sample['abun_minsub_scaled']
-    df_sample.drop_duplicates(inplace=True)
+    # Aggregate temp and abundance by mean on time_bin and m/z
+    df_sample_agg = df_sample.groupby(['m/z', 'time_bin']).agg('mean').reset_index()
     
     # Make a pivot table
-    df_pivot = df_sample.pivot(index=['time_bin', 'temp'],
+    df_pivot = df_sample_agg.pivot(index=['time_bin', 'temp'],
                                columns='m/z', 
-                               values='abun_agg')
+                               values='abun_minsub_scaled')
     
     df_pivot = df_pivot.add_prefix('mz_')
     df_pivot.columns = [i.removesuffix('.0') for i in df_pivot.columns]

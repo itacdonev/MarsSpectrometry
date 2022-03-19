@@ -252,10 +252,17 @@ def dl_time_pivot(metadata, n_sample, max_time):
     df_sample['time_bin'] = pd.cut(df_sample['time'], bins=time_range)
     del df_sample['time']
     
+    # Aggregate features based on the time_bin, temp and m/z
+    # Solves the problem of several measurement within the interval range
+    df_sample['abun_agg'] = df_sample.groupby(['time_bin', 'temp', 'm/z'])['abun_minsub_scaled']\
+            .transform('mean')
+    del df_sample['abun_minsub_scaled']
+    df_sample.drop_duplicates(inplace=True)
+    
     # Make a pivot table
     df_pivot = df_sample.pivot(index=['time_bin', 'temp'],
                                columns='m/z', 
-                               values='abun_minsub_scaled')
+                               values='abun_agg')
     
     df_pivot = df_pivot.add_prefix('mz_')
     df_pivot.columns = [i.removesuffix('.0') for i in df_pivot.columns]

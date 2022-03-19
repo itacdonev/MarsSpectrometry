@@ -275,7 +275,6 @@ def dl_ts(metadata, max_time):
     df = pd.DataFrame()
     
     for i in tqdm(range(metadata.shape[0])):
-        print(i)
         df_pivot = dl_time_pivot(metadata, i, max_time)
         df = pd.concat([df, df_pivot], axis=0)
     

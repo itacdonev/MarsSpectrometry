@@ -239,6 +239,9 @@ def dl_time_pivot(metadata, n_sample, max_time):
     df_sample = preprocess.get_sample(metadata, n_sample)
     df_sample = preprocess.preprocess_samples(df_sample)
     
+    # Get sample name
+    sample_name = metadata.iloc[n_sample]['sample_id']
+    
     # Define the time range
     time_range = pd.interval_range(start=0.0, 
                                end=utils.roundup(max_time), 
@@ -257,10 +260,28 @@ def dl_time_pivot(metadata, n_sample, max_time):
     df_pivot = df_pivot.add_prefix('mz_')
     df_pivot.columns = [i.removesuffix('.0') for i in df_pivot.columns]
     df_pivot = df_pivot.add_suffix('_abund')
+    df_pivot['sample_id'] = sample_name
     
     return df_pivot
     
+def dl_ts(metadata, max_time):
+    """
+    Create a 3D array of time series for DL models.
+    1D - samples
+    2D - features
+    3D - time step
+    """
     
+    df = pd.DataFrame()
+    
+    for i in tqdm(range(metadata.shape[0])):
+        print(i)
+        df_pivot = dl_time_pivot(metadata, i, max_time)
+        df = pd.concat([df, df_pivot], axis=0)
+    
+    return df
+    
+      
 
 # === TARGET ENCODING ===
 

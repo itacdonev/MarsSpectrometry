@@ -239,8 +239,9 @@ def dl_time_pivot(metadata, n_sample, max_time):
     df_sample = preprocess.get_sample(metadata, n_sample)
     df_sample = preprocess.preprocess_samples(df_sample)
     
-    # Get sample name
+    # Get sample name and instrument
     sample_name = metadata.iloc[n_sample]['sample_id']
+    instrument = metadata.iloc[n_sample]['instrument_type']
     
     # Define the time range
     time_range = pd.interval_range(start=0.0, 
@@ -257,8 +258,14 @@ def dl_time_pivot(metadata, n_sample, max_time):
     # Aggregate temp and abundance by mean on time_bin and m/z
     df_sample_agg = df_sample.groupby(['m/z', 'time_bin']).agg('mean').reset_index()
     
+    # There are still duplicates in temp in the sam-testbed samples
+    # Compute standard deviation and store as variable and take the average
+    # of temp for final value
+    df_sample_agg['temp_osc_time'] = df_sample_agg.groupby('time_bin')['temp'].transform('std')
+    df_sample_agg['temp'] = df_sample_agg.groupby('time_bin')['temp'].transform('mean')
+    
     # Make a pivot table
-    df_pivot = df_sample_agg.pivot(index=['time_bin', 'temp'],
+    df_pivot = df_sample_agg.pivot(index=['time_bin', 'temp', 'temp_osc_time'],
                                columns='m/z', 
                                values='abun_minsub_scaled')
     
@@ -266,6 +273,9 @@ def dl_time_pivot(metadata, n_sample, max_time):
     df_pivot.columns = [i.removesuffix('.0') for i in df_pivot.columns]
     df_pivot = df_pivot.add_suffix('_abund')
     df_pivot['sample_id'] = sample_name
+    df_pivot['instrument_type'] = instrument
+    
+    df_pivot = df_pivot.reset_index()
     
     return df_pivot
     

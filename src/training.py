@@ -8,7 +8,6 @@ import numpy as np
 import pandas as pd
 
 
-
 def define_cvfolds(df, no_folds, SEED:int, 
                    group:str=None, strata:str=None):
     """

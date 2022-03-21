@@ -2,7 +2,7 @@ from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from termcolor import colored
-from src import config
+from src import config, model_selection
 import xgboost as xgb
 import numpy as np
 import pandas as pd
@@ -62,7 +62,7 @@ def trainCV_label(X, df_y,
                   target:list, 
                   cv_folds:str,
                   model_metric,
-                  clf, 
+                  model_algo, 
                   verbose:bool=False):
     """
     Training pipeline 
@@ -140,6 +140,7 @@ def trainCV_label(X, df_y,
             #X_valid['instrument_type'] = le.transform(X_valid['instrument_type'])
     
             # Traing the model
+            clf = model_selection.models[model_algo]
             clf.fit(X_train, y_train)
             
             # Compute predictions
@@ -159,7 +160,7 @@ def trainCV_label(X, df_y,
 
 
 
-def train_full_model(X, df_y, target:list, model_algo:str):
+def train_full_model(X, df_y, target:list, model_algo:str, params:dict=None):
     """
     Train full model
     
@@ -175,16 +176,16 @@ def train_full_model(X, df_y, target:list, model_algo:str):
         #print(colored(f'LABEL: {label}', 'blue'))
         y = df_y[label].copy().values
         
-        # Traing the model
-        if model_algo == 'LR':
-            clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
-                                    random_state=config.RANDOM_SEED)
-        elif model_algo == 'XGB':
-            clf = clf = xgb.XGBClassifier(objective = "binary:logistic",
-                                          use_label_encoder = False,
-                                          eval_metric = 'logloss')
+        # Traing the model    
+        clf = model_selection.models[model_algo]
             
         clf_fitted_dict[label] = clf.fit(X, y)
         
     return clf_fitted_dict
 
+def train_tbl(df_train, df_test, df_labels, params):
+    """
+    Train tabular data. The training is done on CV and full dataset.
+    """
+    
+        

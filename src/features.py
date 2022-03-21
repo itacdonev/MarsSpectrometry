@@ -276,7 +276,6 @@ def dl_time_pivot(metadata, n_sample, max_time):
     df_pivot['instrument_type'] = instrument
     
     df_pivot = df_pivot.reset_index()
-    df_pivot = df_pivot.sort_values(by=['sample_id','time_bin'])
     
     return df_pivot
     

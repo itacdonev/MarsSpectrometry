@@ -58,7 +58,6 @@ def define_cvfolds(df, no_folds, SEED:int,
     return df
 
 
-
 def trainCV_label(X, df_y, 
                   target:list, 
                   cv_folds:str,
@@ -160,7 +159,6 @@ def trainCV_label(X, df_y,
     return logloss
 
 
-
 def train_full_model(X, df_y, target:list, model_algo:str):
     """
     Train full model
@@ -177,13 +175,24 @@ def train_full_model(X, df_y, target:list, model_algo:str):
         #print(colored(f'LABEL: {label}', 'blue'))
         y = df_y[label].copy().values
         
-        # Traing the model    
-        clf = model_selection.models[model_algo]
+        # Traing the model
+        if model_algo == 'LR_reg':
+            clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
+                                    random_state=config.RANDOM_SEED)
+
+        elif model_algo == 'XGB':
+            clf = clf = xgb.XGBClassifier(objective = "binary:logistic",
+                                          use_label_encoder = False,
+                                          eval_metric = 'logloss')
+        elif model_algo == 'XGB_opt':
+            clf = clf = xgb.XGBClassifier(objective = "binary:logistic",
+                                          use_label_encoder = False,
+                                          eval_metric = 'logloss',
+                                        learning_rate = 0.09)
             
         clf_fitted_dict[label] = clf.fit(X, y)
         
     return clf_fitted_dict
-
 
 
 def train_tbl(df_train, df_labels, target_list, df_test, model_algo, sub_name:str):
@@ -209,6 +218,7 @@ def train_tbl(df_train, df_labels, target_list, df_test, model_algo, sub_name:st
     
     
     # SUBMISSION
+    #print('Submission')
     submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
                              index_col='sample_id')
     for target in train_full_clf:
@@ -222,3 +232,6 @@ def train_tbl(df_train, df_labels, target_list, df_test, model_algo, sub_name:st
     print(train_cv_loss)
     
     return train_cv_loss, train_full_clf, submission
+
+def my_fun():
+    pass

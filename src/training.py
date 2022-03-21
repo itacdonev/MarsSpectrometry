@@ -1,6 +1,7 @@
 from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import log_loss
 from termcolor import colored
 from src import config, model_selection
 import xgboost as xgb
@@ -160,7 +161,7 @@ def trainCV_label(X, df_y,
 
 
 
-def train_full_model(X, df_y, target:list, model_algo:str, params:dict=None):
+def train_full_model(X, df_y, target:list, model_algo:str):
     """
     Train full model
     
@@ -183,9 +184,41 @@ def train_full_model(X, df_y, target:list, model_algo:str, params:dict=None):
         
     return clf_fitted_dict
 
-def train_tbl(df_train, df_test, df_labels, params):
+
+
+def train_tbl(df_train, df_labels, target_list, df_test, model_algo, sub_name:str):
     """
     Train tabular data. The training is done on CV and full dataset.
     """
     
-        
+    # CV TRAINING
+    #print('CV training ....')
+    train_cv_loss = trainCV_label(X=df_train,
+                                  df_y=df_labels,
+                                  target=target_list, 
+                                  cv_folds=config.NO_CV_FOLDS,
+                                  model_metric=log_loss,
+                                  model_algo=model_algo)
+    
+    # FULL TRAINING
+    #print('Full training .....')
+    train_full_clf = train_full_model(X=df_train,
+                                      df_y=df_labels,
+                                      target=target_list,
+                                      model_algo=model_algo)
+    
+    
+    # SUBMISSION
+    submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
+                             index_col='sample_id')
+    for target in train_full_clf:
+        clf = train_full_clf[target]
+        submission[target] = clf.predict_proba(df_test)[:,1]
+    
+    submission.to_csv(config.MODELS_DIR + sub_name + '.csv')
+    
+    print(colored(f'\nAverage Log Loss: {np.round(np.mean(list(train_cv_loss.values())), 4)}', 'blue'))
+    print('Log Loss per Label:')
+    print(train_cv_loss)
+    
+    return train_cv_loss, train_full_clf, submission

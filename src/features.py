@@ -404,7 +404,7 @@ def label_encode(df,
     return averages
 
 
-def label_encode_multi(df, feature, target_labels_list:str):
+def label_encode_multi(df, df_test, feature, target_labels_list:str):
     
     le_dict = {}
     
@@ -413,6 +413,10 @@ def label_encode_multi(df, feature, target_labels_list:str):
         le_dict = le_dict | le.to_dict()
         
         df['le_'+label] = df[feature].map(le.to_dict()[label])
+        df_test['le_'+label] = df_test[feature].map(le.to_dict()[label])
         
-    return df, le_dict
+    df = df.drop(target_labels_list + [feature], axis=1)    
+    df_test = df_test.drop([feature], axis=1)    
+    
+    return df, df_test, le_dict
     

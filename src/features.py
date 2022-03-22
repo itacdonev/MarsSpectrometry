@@ -375,3 +375,44 @@ def slope_time_temp(train_files:dict, metadata):
         coefs_lr[sample_name] = lr.coef_[0]
         
     return coefs_lr
+
+
+# ===== TARGET ENCODING =====
+# Target encode each label on instrument type and save
+# as a variable. There should be 11 additional variables
+def label_encode(df, 
+                 feature:str, 
+                 target:str, 
+                 min_samples_leaf=1,
+                 smoothing=1):
+    """
+    Target encode feature.
+    """
+    # Compute target mean and count
+    averages = df.groupby(feature)[target].agg(['mean', 'count'])
+    
+    # Compute smoothing
+    smoothing = 1 / (1 + np.exp(-(averages["count"] - min_samples_leaf) / smoothing))
+    
+    prior = df[target].mean()
+    averages[target] = prior * (1 - smoothing) + averages["mean"] * smoothing
+    averages.drop(["mean", "count"], axis=1, inplace=True)
+    #averages = averages.reset_index().pivot(columns='instrument_type', 
+    #                                        index='sample_id')
+    #averages.columns = averages.columns.map(lambda x: '_'.join([str(i) for i in x]))
+    
+    return averages
+
+
+def label_encode_multi(df, feature, target_labels_list:str):
+    
+    le_dict = {}
+    
+    for label in target_labels_list:
+        le = label_encode(df, feature, label)
+        le_dict = le_dict | le.to_dict()
+        
+        df['le_'+label] = df[feature].map(le.to_dict()[label])
+        
+    return df, le_dict
+    

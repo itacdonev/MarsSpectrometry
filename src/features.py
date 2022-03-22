@@ -9,6 +9,7 @@ from src import config, preprocess, utils
 from scipy.signal import find_peaks
 from scipy.ndimage.filters import gaussian_filter1d
 from sklearn.metrics import auc
+from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 import gc
 
@@ -297,16 +298,6 @@ def dl_ts(metadata, max_time):
     
       
 
-# === TARGET ENCODING ===
-
-
-       
-
-
-
-
-
-
 # Compute average abundance for each sample
 def compute_abundance_per_ion(df_sample, sample_name:str, stat:str):
     """ Compute average abundance per ion type"""
@@ -360,3 +351,27 @@ def avg_temp_sample(df, df_files):
     df['avg_temp'] = df.index.map(avg_temp_sample)
     
     return df
+
+def slope_time_temp(train_files:dict, metadata):
+    """
+    Compute slope of time ~ temp for each sample using
+    linear regression. Is there any difference between
+    commercial and sam_testbed samples?
+    """
+    
+    coefs_lr = {}
+    
+    for i in tqdm(train_files):
+        ht = preprocess.get_sample(metadata, i)
+        ht = preprocess.preprocess_samples(ht)
+        sample_name = metadata.iloc[i]['sample_id']
+        
+        lr = LinearRegression(fit_intercept=False, n_jobs=-1)
+        
+        X = np.array(ht['time']).reshape(-1, 1)
+        y = ht['temp'].values
+        lr.fit(X, y)
+    
+        coefs_lr[sample_name] = lr.coef_[0]
+        
+    return coefs_lr

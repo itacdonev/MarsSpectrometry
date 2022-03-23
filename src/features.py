@@ -153,7 +153,8 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
         med = temp_dt['abun_minsub_scaled_filtered'].median()
         
         # Find peaks
-        peaks, _ = find_peaks(temp_dt['abun_minsub_scaled_filtered'], prominence=med)
+        peaks, _ = find_peaks(temp_dt['abun_minsub_scaled_filtered'], 
+                              prominence=med)
         ion_peaks_info.append(len(peaks))
         
         # Peak statistics
@@ -388,7 +389,8 @@ def label_encode(df,
                  min_samples_leaf=1,
                  smoothing=1):
     """
-    Target encode feature.
+    Target encode feature. Feature and label should be in
+    the same data frame.
     """
     # Compute target mean and count
     averages = df.groupby(feature)[target].agg(['mean', 'count'])
@@ -483,7 +485,10 @@ def get_topN_ions(metadata, N:int=3, normalize:bool=True,
             temp[col] = col_std * (ub - lb) + lb
     
     # Fix the index
-    temp.index = temp.index.set_names('sample_id')
-    temp = temp.reset_index()
+    #temp.index = temp.index.set_names('sample_id')
+    #temp = temp.reset_index()
     
     return temp
+
+
+#

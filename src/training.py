@@ -8,6 +8,7 @@ import xgboost as xgb
 import numpy as np
 import pandas as pd
 import os
+from sklearn import svm
 
 
 def define_cvfolds(df, no_folds, SEED:int, 
@@ -198,14 +199,16 @@ def train_full_model(X, df_y, target:list, model_algo:str):
                                     random_state=config.RANDOM_SEED)
 
         elif model_algo == 'XGB':
-            clf = clf = xgb.XGBClassifier(objective = "binary:logistic",
+            clf = xgb.XGBClassifier(objective = "binary:logistic",
                                           use_label_encoder = False,
                                           eval_metric = 'logloss')
         elif model_algo == 'XGB_opt':
-            clf = clf = xgb.XGBClassifier(objective = "binary:logistic",
+            clf = xgb.XGBClassifier(objective = "binary:logistic",
                                           use_label_encoder = False,
                                           eval_metric = 'logloss',
                                         learning_rate = 0.09)
+        elif model_algo == 'SVC':
+            clf = svm.SVC(probability=True)
             
         clf_fitted_dict[label] = clf.fit(X, y)
         

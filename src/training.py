@@ -3,7 +3,7 @@ from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
 from termcolor import colored
-from src import config, model_selection
+from src import config, features, model_selection
 import xgboost as xgb
 import numpy as np
 import pandas as pd
@@ -63,7 +63,9 @@ def trainCV_label(X, df_y,
                   cv_folds:str,
                   model_metric,
                   model_algo, 
-                  verbose:bool=False):
+                  verbose:bool=False,
+                  target_encode:bool=False,
+                  te_features:list=None):
     """
     Training pipeline 
         - tabular one target label at a time
@@ -107,6 +109,7 @@ def trainCV_label(X, df_y,
     # MODEL INFORMATION
     logloss = {}    # Average value of log loss for each label
     
+    # TRAIN EACH LABEL SEPARATELY
     for label in label_names: 
         if verbose:
             print(colored(f'\nLABEL: {label}', 'blue'))
@@ -139,6 +142,19 @@ def trainCV_label(X, df_y,
             #X_train['instrument_type'] = le.fit_transform(X_train['instrument_type'])
             #X_valid['instrument_type'] = le.transform(X_valid['instrument_type'])
     
+            # Target encoding
+            if target_encode:
+                print('Encoding ...')
+                temp = pd.concat([X_train.reset_index(drop=True), 
+                                pd.Series(y_train, name=label)], 
+                                axis=1)
+                Xtr_te = features.label_encode(df=temp,
+                                                feature='top_1',
+                                                target=label)
+                Xtr_te = Xtr_te.to_dict()
+                X_train['top_1'] = X_train['top_1'].map(Xtr_te[label])
+                X_valid['top_1'] = X_valid['top_1'].map(Xtr_te[label])
+                
             # Traing the model
             clf = model_selection.models[model_algo]
             clf.fit(X_train, y_train)
@@ -195,7 +211,9 @@ def train_full_model(X, df_y, target:list, model_algo:str):
     return clf_fitted_dict
 
 
-def train_tbl(df_train, df_labels, target_list, df_test, model_algo, sub_name:str):
+def train_tbl(df_train, df_labels, target_list, df_test, 
+              model_algo, sub_name:str, target_encode:bool=None,
+              verbose:bool=False):
     """
     Train tabular data. The training is done on CV and full dataset.
     """
@@ -207,7 +225,9 @@ def train_tbl(df_train, df_labels, target_list, df_test, model_algo, sub_name:st
                                   target=target_list, 
                                   cv_folds=config.NO_CV_FOLDS,
                                   model_metric=log_loss,
-                                  model_algo=model_algo)
+                                  model_algo=model_algo,
+                                  target_encode=target_encode,
+                                  verbose=verbose)
     
     # FULL TRAINING
     #print('Full training .....')
@@ -232,6 +252,3 @@ def train_tbl(df_train, df_labels, target_list, df_test, model_algo, sub_name:st
     print(train_cv_loss)
     
     return train_cv_loss, train_full_clf, submission
-
-def my_fun():
-    pass

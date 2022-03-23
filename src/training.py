@@ -7,6 +7,7 @@ from src import config, features, model_selection
 import xgboost as xgb
 import numpy as np
 import pandas as pd
+import os
 
 
 def define_cvfolds(df, no_folds, SEED:int, 
@@ -216,8 +217,21 @@ def train_tbl(df_train, df_labels, target_list, df_test,
               verbose:bool=False):
     """
     Train tabular data. The training is done on CV and full dataset.
-    """
     
+    Arguments
+    ---------
+        df_train: pandas data frame or name of the saved table in
+                  /output file folder.
+    """
+    # Read in the data
+    if not isinstance(df_train, pd.DataFrame):
+        df_train = pd.read_csv(os.path.join(config.DATA_DIR_OUT + 
+                                            df_train + '.csv'))
+    
+    if not isinstance(df_test, pd.DataFrame):  
+        df_test = pd.read_csv(os.path.join(config.DATA_DIR_OUT + 
+                                            df_test + '.csv'))
+        
     # CV TRAINING
     #print('CV training ....')
     train_cv_loss = trainCV_label(X=df_train,

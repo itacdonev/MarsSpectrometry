@@ -1,6 +1,7 @@
 """Feature engineering"""
 
 
+from calendar import c
 from importlib.metadata import metadata
 from operator import index
 import pandas as pd
@@ -422,7 +423,8 @@ def label_encode_multi(df, df_test, feature, target_labels_list:str):
     return df, df_test, le_dict
     
 
-def get_topN_ions(metadata, N:int=3):
+def get_topN_ions(metadata, N:int=3, normalize:bool=True, 
+                  lb:float=0.0, ub:float=0.99):
     """
     Compute top N ions by their max relative
     abundance. 
@@ -433,7 +435,16 @@ def get_topN_ions(metadata, N:int=3):
         
         N: int (default=3)
             Number of top ions to store
-    
+        
+        normalize: str (default=True)
+            Should the values be normalized
+            
+        up: float (default=0.99)
+            Upper bound of feature range.
+        
+        lb: float (default=0.0)
+            Lower bound of feature range.
+            
     Returns
     -------
         dictionary of sample and a list of top N ions
@@ -461,5 +472,18 @@ def get_topN_ions(metadata, N:int=3):
     temp = pd.DataFrame.from_dict(top3_ions, orient='index')
     # Rename columns
     temp.columns = ['top_%s' % (i+1) for i in range(N)]
+    
+    # Normalize values
+    if normalize:
+        # Compute min,max for all columns
+        minv = (temp.min()).min()
+        maxv = (temp.max()).max()
+        for col in temp:
+            col_std = (temp[col] - minv) / (maxv - minv)
+            temp[col] = col_std * (ub - lb) + lb
+    
+    # Fix the index
+    temp.index = temp.index.set_names('sample_id')
+    temp = temp.reset_index()
     
     return temp

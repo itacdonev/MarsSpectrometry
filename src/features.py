@@ -380,6 +380,7 @@ def slope_time_temp(train_files:dict, metadata):
 # ===== TARGET ENCODING =====
 # Target encode each label on instrument type and save
 # as a variable. There should be 11 additional variables
+#TODO Fix to work on CV
 def label_encode(df, 
                  feature:str, 
                  target:str, 
@@ -405,7 +406,7 @@ def label_encode(df,
 
 
 def label_encode_multi(df, df_test, feature, target_labels_list:str):
-    
+    #TODO Fix to work on CV
     le_dict = {}
     
     for label in target_labels_list:
@@ -420,3 +421,45 @@ def label_encode_multi(df, df_test, feature, target_labels_list:str):
     
     return df, df_test, le_dict
     
+
+def get_topN_ions(metadata, N:int=3):
+    """
+    Compute top N ions by their max relative
+    abundance. 
+    
+    Parameters
+    ----------
+        metadata: pandas data frame
+        
+        N: int (default=3)
+            Number of top ions to store
+    
+    Returns
+    -------
+        dictionary of sample and a list of top N ions
+    """
+    
+    top3_ions = {} # sample, list of top 3 ions - {'S0000',[18.0, 9.0, 25.0]}
+    
+    # Compute for each sample in metadata
+    for i in tqdm(range(metadata.shape[0])):
+        # Get and preprocess data sample
+        hts = preprocess.get_sample(metadata, i)
+        hts = preprocess.preprocess_samples(hts)
+        sample_name = metadata.iloc[i]['sample_id']
+        
+        # Compute top 3 ions by relative abundance
+        # Take max of each ion group sort and slice top N
+        top3 = list((hts.groupby('m/z')['abun_minsub_scaled']\
+                        .agg('max')\
+                        .sort_values(ascending=False))\
+                            .head(N).index)
+        
+        top3_ions[sample_name] = top3
+    
+    # Convert to data frame
+    temp = pd.DataFrame.from_dict(top3_ions, orient='index')
+    # Rename columns
+    temp.columns = ['top_%s' % (i+1) for i in range(N)]
+    
+    return temp

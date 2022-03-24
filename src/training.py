@@ -114,6 +114,7 @@ def trainCV_label(X, df_y,
     
     # TRAIN EACH LABEL SEPARATELY
     for label in label_names: 
+        #print(colored(label, 'blue'))
         if verbose:
             print(colored(f'\nLABEL: {label}', 'blue'))
         
@@ -151,6 +152,7 @@ def trainCV_label(X, df_y,
                 if not target_encode_fts:
                     raise Exception(('Need to define which features to encode!'))
                 else:
+                    #print('Encoding ...')
                     temp = pd.concat([X_train.reset_index(drop=True), 
                                 pd.Series(y_train, name=label)], 
                                 axis=1)
@@ -272,14 +274,17 @@ def train_tbl(df_train, df_labels, target_list, df_test,
                                   model_metric=log_loss,
                                   model_algo=model_algo,
                                   target_encode=target_encode,
-                                  verbose=verbose)
+                                  verbose=verbose,
+                                  target_encode_fts=target_encode_fts)
     
     # FULL TRAINING
     #print('Full training .....')
     train_full_clf, te_fts = train_full_model(X=df_train,
                                       df_y=df_labels,
                                       target=target_list,
-                                      model_algo=model_algo)
+                                      model_algo=model_algo,
+                                      target_encode=target_encode,
+                                      target_encode_fts=target_encode_fts)
     
     # Apply target encoder on validation data
     if target_encode:

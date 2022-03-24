@@ -1,3 +1,4 @@
+from logging import raiseExceptions
 from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
@@ -67,7 +68,7 @@ def trainCV_label(X, df_y,
                   model_algo, 
                   verbose:bool=False,
                   target_encode:bool=False,
-                  te_features:list=None):
+                  target_encode_fts:list=None):
     """
     Training pipeline 
         - tabular one target label at a time
@@ -144,18 +145,23 @@ def trainCV_label(X, df_y,
             #X_train['instrument_type'] = le.fit_transform(X_train['instrument_type'])
             #X_valid['instrument_type'] = le.transform(X_valid['instrument_type'])
     
-            # Target encoding
+            # ----- TARGET ENCODING -----        
             if target_encode:
-                print('Encoding ...')
-                temp = pd.concat([X_train.reset_index(drop=True), 
+                #print('Encoding ...')
+                if not target_encode_fts:
+                    raise Exception(('Need to define which features to encode!'))
+                else:
+                    temp = pd.concat([X_train.reset_index(drop=True), 
                                 pd.Series(y_train, name=label)], 
                                 axis=1)
-                Xtr_te = features.label_encode(df=temp,
-                                                feature='top_1',
-                                                target=label)
-                Xtr_te = Xtr_te.to_dict()
-                X_train['top_1'] = X_train['top_1'].map(Xtr_te[label])
-                X_valid['top_1'] = X_valid['top_1'].map(Xtr_te[label])
+                    # Loop over each feature to encode
+                    for fts in target_encode_fts: 
+                        Xtr_te = features.label_encode(df=temp,
+                                                        feature=fts,
+                                                        target=label)
+                        Xtr_te = Xtr_te.to_dict()
+                        X_train[fts] = X_train[fts].map(Xtr_te[label])
+                        X_valid['top_1'] = X_valid[fts].map(Xtr_te[label])
                 
             # Traing the model
             clf = model_selection.models[model_algo]
@@ -177,7 +183,9 @@ def trainCV_label(X, df_y,
     return logloss
 
 
-def train_full_model(X, df_y, target:list, model_algo:str):
+def train_full_model(X, df_y, target:list, model_algo:str,
+                     target_encode:bool=None,
+                     target_encode_fts:list=None):
     """
     Train full model
     
@@ -192,8 +200,27 @@ def train_full_model(X, df_y, target:list, model_algo:str):
         # Select one label   
         #print(colored(f'LABEL: {label}', 'blue'))
         y = df_y[label].copy().values
-        
-        # Traing the model
+
+        # ----- TARGET ENCODING -----        
+        if target_encode:
+            #print('Encoding ...')
+            te_fts = {} # dict to store target encoder
+            if not target_encode_fts:
+                raise Exception(('Need to define which features to encode!'))
+            else:
+                temp = pd.concat([X.reset_index(drop=True), 
+                                    pd.Series(y, name=label)], 
+                                    axis=1)
+                # Loop over each feature to encode
+                for fts in target_encode_fts: 
+                    Xtr_te = features.label_encode(df=temp,
+                                                    feature=fts,
+                                                    target=label)
+                    Xtr_te = Xtr_te.to_dict()
+                    te_fts[fts] = Xtr_te
+                    X[fts] = X[fts].map(Xtr_te[label])
+
+        # ----- Traing the model -----
         if model_algo == 'LR_reg':
             clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
                                     random_state=config.RANDOM_SEED)
@@ -212,11 +239,12 @@ def train_full_model(X, df_y, target:list, model_algo:str):
             
         clf_fitted_dict[label] = clf.fit(X, y)
         
-    return clf_fitted_dict
+    return clf_fitted_dict, te_fts
 
 
 def train_tbl(df_train, df_labels, target_list, df_test, 
-              model_algo, sub_name:str, target_encode:bool=None,
+              model_algo, sub_name:str, 
+              target_encode:bool=None, target_encode_fts:list=None,
               verbose:bool=False):
     """
     Train tabular data. The training is done on CV and full dataset.
@@ -248,11 +276,18 @@ def train_tbl(df_train, df_labels, target_list, df_test,
     
     # FULL TRAINING
     #print('Full training .....')
-    train_full_clf = train_full_model(X=df_train,
+    train_full_clf, te_fts = train_full_model(X=df_train,
                                       df_y=df_labels,
                                       target=target_list,
                                       model_algo=model_algo)
     
+    # Apply target encoder on validation data
+    if target_encode:
+        if not target_encode_fts:
+                raise Exception(('Need to define which features to encode!'))
+        for fts in target_encode_fts:
+            df_test[fts] = df_test[fts].map(te_fts[fts])#.fillna(0)
+            
     
     # SUBMISSION
     #print('Submission')

@@ -149,21 +149,34 @@ def trainCV_label(X, df_y,
             # ----- TARGET ENCODING -----        
             if target_encode:
                 #print('Encoding ...')
+                X_train_te = X_train.copy()
+                X_valid_te = X_valid.copy()
+                
                 if not target_encode_fts:
                     raise Exception(('Need to define which features to encode!'))
                 else:
                     #print('Encoding ...')
-                    temp = pd.concat([X_train.reset_index(drop=True), 
+                    temp = pd.concat([X_train_te.reset_index(drop=True), 
                                 pd.Series(y_train, name=label)], 
                                 axis=1)
                     # Loop over each feature to encode
                     for fts in target_encode_fts: 
+                        #print(colored(fts, 'magenta'))
                         Xtr_te = features.label_encode(df=temp,
                                                         feature=fts,
                                                         target=label)
-                        Xtr_te = Xtr_te.to_dict()
-                        X_train[fts] = X_train[fts].map(Xtr_te[label])
-                        X_valid['top_1'] = X_valid[fts].map(Xtr_te[label]).fillna(0)
+                        # Transform on train data
+                        te_ft = Xtr_te.to_dict()
+                        # Map encoding to train and valid
+                        X_train_te[fts+'_te'] = X_train_te[fts].map(te_ft[label])
+                        X_valid_te[fts+'_te'] = X_valid_te[fts].map(te_ft[label])
+            
+                # Delete original encoded columns
+                X_train = X_train_te.copy()
+                X_train.drop(target_encode_fts, axis=1, inplace=True)
+                X_valid = X_valid_te.copy()
+                X_valid.drop(target_encode_fts, axis=1, inplace=True)
+                del X_train_te, X_valid_te
                 
             # Traing the model
             clf = model_selection.models[model_algo]
@@ -207,7 +220,6 @@ def train_full_model(X, df_y, target:list, model_algo:str,
         # ----- TARGET ENCODING -----        
         if target_encode:
             #print('Encoding ...')
-            te_fts = pd.DataFrame() # dict to store target encoder
             if not target_encode_fts:
                 raise Exception(('Need to define which features to encode!'))
             else:
@@ -234,10 +246,12 @@ def train_full_model(X, df_y, target:list, model_algo:str,
                                              axis=0)
                     del Xtr_te
         
-        # Delete original encoded columns
-        Xte = X.copy()
-        Xte.drop(target_encode_fts, axis=1, inplace=True)
-            
+            # Delete original encoded columns
+            Xtrain = X.copy()
+            Xtrain.drop(target_encode_fts, axis=1, inplace=True)
+        else:
+            Xtrain = X.copy()
+                    
         # ----- Traing the model -----
         #print(colored('TRAINING', 'red'))
         if model_algo == 'LR_reg':
@@ -256,9 +270,9 @@ def train_full_model(X, df_y, target:list, model_algo:str,
         elif model_algo == 'SVC':
             clf = svm.SVC(probability=True)
             
-        clf_fitted_dict[label] = clf.fit(Xte, y)
+        clf_fitted_dict[label] = clf.fit(Xtrain, y)
         
-    return clf_fitted_dict, df_te_fitted, Xte
+    return clf_fitted_dict, df_te_fitted, Xtrain
 
 
 def train_tbl(df_train, df_labels, target_list, df_test, 

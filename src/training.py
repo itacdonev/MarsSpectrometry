@@ -114,7 +114,7 @@ def trainCV_label(X, df_y,
     
     # TRAIN EACH LABEL SEPARATELY
     for label in label_names: 
-        #print(colored(label, 'blue'))
+        print(colored(label, 'blue'))
         if verbose:
             print(colored(f'\nLABEL: {label}', 'blue'))
         
@@ -163,7 +163,7 @@ def trainCV_label(X, df_y,
                                                         target=label)
                         Xtr_te = Xtr_te.to_dict()
                         X_train[fts] = X_train[fts].map(Xtr_te[label])
-                        X_valid['top_1'] = X_valid[fts].map(Xtr_te[label])
+                        X_valid['top_1'] = X_valid[fts].map(Xtr_te[label]).fillna(0)
                 
             # Traing the model
             clf = model_selection.models[model_algo]
@@ -195,7 +195,8 @@ def train_full_model(X, df_y, target:list, model_algo:str,
     """
     # Get label names
     label_names = df_y[target]
-    clf_fitted_dict = {}
+    clf_fitted_dict = {}              # fitted classifiers
+    df_te_fitted = pd.DataFrame()     # target encoding
     
     for label in label_names: 
         
@@ -206,7 +207,7 @@ def train_full_model(X, df_y, target:list, model_algo:str,
         # ----- TARGET ENCODING -----        
         if target_encode:
             #print('Encoding ...')
-            te_fts = {} # dict to store target encoder
+            te_fts = pd.DataFrame() # dict to store target encoder
             if not target_encode_fts:
                 raise Exception(('Need to define which features to encode!'))
             else:
@@ -215,14 +216,30 @@ def train_full_model(X, df_y, target:list, model_algo:str,
                                     axis=1)
                 # Loop over each feature to encode
                 for fts in target_encode_fts: 
+                    #print(colored(fts, 'magenta'))
                     Xtr_te = features.label_encode(df=temp,
                                                     feature=fts,
                                                     target=label)
-                    Xtr_te = Xtr_te.to_dict()
-                    te_fts[fts] = Xtr_te
-                    X[fts] = X[fts].map(Xtr_te[label])
-
+                    # Transform on train data
+                    te_ft = Xtr_te.to_dict()
+                    X[fts+'_te'] = X[fts].map(te_ft[label])
+                    # Finishes the 1st one and it replaces the original data
+                    # Save for transform
+                    Xtr_te.index.set_names('ion', inplace=True)
+                    Xtr_te = Xtr_te.reset_index()
+                    Xtr_te = pd.melt(Xtr_te, id_vars='ion', value_vars=label)
+                    Xtr_te['topN'] = fts
+                    #print(Xtr_te)
+                    df_te_fitted = pd.concat([df_te_fitted, Xtr_te], 
+                                             axis=0)
+                    del Xtr_te
+        
+        # Delete original encoded columns
+        Xte = X.copy()
+        Xte.drop(target_encode_fts, axis=1, inplace=True)
+            
         # ----- Traing the model -----
+        #print(colored('TRAINING', 'red'))
         if model_algo == 'LR_reg':
             clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
                                     random_state=config.RANDOM_SEED)
@@ -239,14 +256,15 @@ def train_full_model(X, df_y, target:list, model_algo:str,
         elif model_algo == 'SVC':
             clf = svm.SVC(probability=True)
             
-        clf_fitted_dict[label] = clf.fit(X, y)
+        clf_fitted_dict[label] = clf.fit(Xte, y)
         
-    return clf_fitted_dict, te_fts
+    return clf_fitted_dict, df_te_fitted, Xte
 
 
 def train_tbl(df_train, df_labels, target_list, df_test, 
               model_algo, sub_name:str, 
-              target_encode:bool=None, target_encode_fts:list=None,
+              target_encode:bool=None, 
+              target_encode_fts:list=None,
               verbose:bool=False):
     """
     Train tabular data. The training is done on CV and full dataset.
@@ -266,7 +284,7 @@ def train_tbl(df_train, df_labels, target_list, df_test,
                                             df_test + '.csv'))
         
     # CV TRAINING
-    #print('CV training ....')
+    print('CV training ....')
     train_cv_loss = trainCV_label(X=df_train,
                                   df_y=df_labels,
                                   target=target_list, 
@@ -278,28 +296,36 @@ def train_tbl(df_train, df_labels, target_list, df_test,
                                   target_encode_fts=target_encode_fts)
     
     # FULL TRAINING
-    #print('Full training .....')
-    train_full_clf, te_fts = train_full_model(X=df_train,
+    print('Full training .....')
+    train_full_clf, te_fitted = train_full_model(X=df_train,
                                       df_y=df_labels,
                                       target=target_list,
                                       model_algo=model_algo,
                                       target_encode=target_encode,
                                       target_encode_fts=target_encode_fts)
     
-    # Apply target encoder on validation data
-    if target_encode:
-        if not target_encode_fts:
-                raise Exception(('Need to define which features to encode!'))
-        for fts in target_encode_fts:
-            df_test[fts] = df_test[fts].map(te_fts[fts])#.fillna(0)
-            
-    
-    # SUBMISSION
-    #print('Submission')
+    # ===== SUBMISSION =====
+    print('Submission')  
     submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
                              index_col='sample_id')
+    
     for target in train_full_clf:
+        # Choose classifier
         clf = train_full_clf[target]
+        
+        # Transform label encoding
+        # Apply target encoder on validation data
+        if target_encode:
+            print('Target encoding ... ')
+            if not target_encode_fts:
+                    raise Exception(('Need to define which features to encode!'))
+            for fts in target_encode_fts:
+                print(te_fitted[target][fts])
+                df_test[fts] = df_test[fts].map(te_fitted[target][fts])
+                print(df_test[fts].isnull().sum())
+                #df_test[fts] = df_test[fts].fillna(0)
+        
+        # Make predictions
         submission[target] = clf.predict_proba(df_test)[:,1]
     
     submission.to_csv(config.MODELS_DIR + sub_name + '.csv')

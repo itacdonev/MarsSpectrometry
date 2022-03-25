@@ -199,18 +199,27 @@ def trainCV_label(X, df_y,
     return logloss
 
 
-def train_full_model(X, df_y, target:list, model_algo:str,
+def train_full_model(X, df_y, 
+                     target:list, 
+                     Xte, 
+                     model_algo:str,
                      target_encode:bool=None,
-                     target_encode_fts:list=None):
+                     target_encode_fts:list=None
+                     ):
     """
     Train full model
     
     model_algo: 'LR', 'XGB'
     """
+    # Read in the submission file
+    submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
+                            index_col='sample_id')
+    assert submission.shape[0] == Xte.shape[0]
+    
     # Get label names
     label_names = df_y[target]
-    clf_fitted_dict = {}              # fitted classifiers
-    df_te_fitted = pd.DataFrame()     # target encoding
+    #clf_fitted_dict = {}              # fitted classifiers
+    #df_te_fitted = pd.DataFrame()     # target encoding
     
     for label in label_names: 
         
@@ -236,25 +245,21 @@ def train_full_model(X, df_y, target:list, model_algo:str,
                     # Transform on train data
                     te_ft = Xtr_te.to_dict()
                     X[fts+'_te'] = X[fts].map(te_ft[label])
-                    # Finishes the 1st one and it replaces the original data
-                    # Save for transform
-                    Xtr_te.index.set_names('ion', inplace=True)
-                    Xtr_te = Xtr_te.reset_index()
-                    Xtr_te = pd.melt(Xtr_te, id_vars='ion', value_vars=label)
-                    Xtr_te['topN'] = fts
-                    #print(Xtr_te)
-                    df_te_fitted = pd.concat([df_te_fitted, Xtr_te], 
-                                             axis=0)
-                    del Xtr_te
-        
+                    Xte[fts+'_te'] = Xte[fts].map(te_ft[label]).fillna(0)
+            
+            #print(X.head())
+            #print(Xte.head())       
+            
             # Delete original encoded columns
             Xtrain = X.copy()
             Xtrain.drop(target_encode_fts, axis=1, inplace=True)
+            Xtest = Xte.copy()
+            Xtest.drop(target_encode_fts, axis=1, inplace=True)
         else:
             Xtrain = X.copy()
+            Xtest = Xte.copy()
                     
-        # ----- Traing the model -----
-        #print(colored('TRAINING', 'red'))
+        # ----- MODEL SELECTION -----
         if model_algo == 'LR_reg':
             clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
                                     random_state=config.RANDOM_SEED)
@@ -270,14 +275,23 @@ def train_full_model(X, df_y, target:list, model_algo:str,
                                         learning_rate = 0.09)
         elif model_algo == 'SVC':
             clf = svm.SVC(probability=True)
-            
-        clf_fitted_dict[label] = clf.fit(Xtrain, y)
+         
+        # ===== FIT THE MODEL FOR LABEL =====
+        #print('Fit the model')
+        #clf_fitted_dict[label] = clf.fit(Xtrain, y)
+        clf.fit(Xtrain, y)
         
-    return clf_fitted_dict, df_te_fitted, Xtrain
+        # Make predictions
+        submission[label] = clf.predict_proba(Xtest)[:,1]
+        
+    return submission 
 
 
-def train_tbl(df_train, df_labels, target_list, df_test, 
-              model_algo, sub_name:str, 
+def train_tbl(df_train, df_labels, 
+              target_list, 
+              df_test, 
+              model_algo, 
+              sub_name:str, 
               target_encode:bool=None, 
               target_encode_fts:list=None,
               verbose:bool=False):
@@ -299,7 +313,7 @@ def train_tbl(df_train, df_labels, target_list, df_test,
                                             df_test + '.csv'))
         
     # CV TRAINING
-    print('CV training ....')
+    #print('CV training ....')
     train_cv_loss = trainCV_label(X=df_train,
                                   df_y=df_labels,
                                   target=target_list, 
@@ -311,42 +325,20 @@ def train_tbl(df_train, df_labels, target_list, df_test,
                                   target_encode_fts=target_encode_fts)
     
     # FULL TRAINING
-    print('Full training .....')
-    train_full_clf, te_fitted = train_full_model(X=df_train,
-                                      df_y=df_labels,
-                                      target=target_list,
-                                      model_algo=model_algo,
-                                      target_encode=target_encode,
-                                      target_encode_fts=target_encode_fts)
+    #print('Full training .....')
+    submission = train_full_model(X=df_train,
+                                  df_y=df_labels,
+                                  Xte=df_test,    
+                                  target=target_list,
+                                  model_algo=model_algo,
+                                  target_encode=target_encode,
+                                  target_encode_fts=target_encode_fts)
     
-    # ===== SUBMISSION =====
-    print('Submission')  
-    submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
-                             index_col='sample_id')
-    
-    for target in train_full_clf:
-        # Choose classifier
-        clf = train_full_clf[target]
-        
-        # Transform label encoding
-        # Apply target encoder on validation data
-        if target_encode:
-            print('Target encoding ... ')
-            if not target_encode_fts:
-                    raise Exception(('Need to define which features to encode!'))
-            for fts in target_encode_fts:
-                print(te_fitted[target][fts])
-                df_test[fts] = df_test[fts].map(te_fitted[target][fts])
-                print(df_test[fts].isnull().sum())
-                #df_test[fts] = df_test[fts].fillna(0)
-        
-        # Make predictions
-        submission[target] = clf.predict_proba(df_test)[:,1]
-    
+    # Save submission file
     submission.to_csv(config.MODELS_DIR + sub_name + '.csv')
     
     print(colored(f'\nAverage Log Loss: {np.round(np.mean(list(train_cv_loss.values())), 4)}', 'blue'))
     print('Log Loss per Label:')
     print(train_cv_loss)
     
-    return train_cv_loss, train_full_clf, submission
+    return train_cv_loss, submission

@@ -114,7 +114,7 @@ def trainCV_label(X, df_y,
     
     # TRAIN EACH LABEL SEPARATELY
     for label in label_names: 
-        print(colored(label, 'blue'))
+        #print(colored(label, 'blue'))
         if verbose:
             print(colored(f'\nLABEL: {label}', 'blue'))
         
@@ -131,6 +131,7 @@ def trainCV_label(X, df_y,
         
         # Define the folds and train the model
         for fold, (t_, v_) in enumerate(cv.split(X, y)):
+            #print(colored(f'FOLD {fold+1}', 'magenta'))
             X_train = X.iloc[t_].copy()
             y_train = y.iloc[t_].values
             X_valid = X.iloc[v_].copy()
@@ -149,14 +150,11 @@ def trainCV_label(X, df_y,
             # ----- TARGET ENCODING -----        
             if target_encode:
                 #print('Encoding ...')
-                X_train_te = X_train.copy()
-                X_valid_te = X_valid.copy()
-                
                 if not target_encode_fts:
                     raise Exception(('Need to define which features to encode!'))
                 else:
                     #print('Encoding ...')
-                    temp = pd.concat([X_train_te.reset_index(drop=True), 
+                    temp = pd.concat([X_train.reset_index(drop=True), 
                                 pd.Series(y_train, name=label)], 
                                 axis=1)
                     # Loop over each feature to encode
@@ -168,22 +166,25 @@ def trainCV_label(X, df_y,
                         # Transform on train data
                         te_ft = Xtr_te.to_dict()
                         # Map encoding to train and valid
-                        X_train_te[fts+'_te'] = X_train_te[fts].map(te_ft[label])
-                        X_valid_te[fts+'_te'] = X_valid_te[fts].map(te_ft[label])
-            
+                        X_train[fts+'_te'] = X_train[fts].map(te_ft[label])
+                        X_valid[fts+'_te'] = X_valid[fts].map(te_ft[label]).fillna(0)
+                    
                 # Delete original encoded columns
-                X_train = X_train_te.copy()
-                X_train.drop(target_encode_fts, axis=1, inplace=True)
-                X_valid = X_valid_te.copy()
-                X_valid.drop(target_encode_fts, axis=1, inplace=True)
-                del X_train_te, X_valid_te
-                
+                Xtrain = X_train.copy()
+                Xtrain.drop(target_encode_fts, axis=1, inplace=True)
+                Xvalid = X_valid.copy()
+                Xvalid.drop(target_encode_fts, axis=1, inplace=True)
+            else:
+                Xtrain = X_train.copy()    
+                Xvalid = X_valid.copy()
+            
+            
             # Traing the model
             clf = model_selection.models[model_algo]
-            clf.fit(X_train, y_train)
+            clf.fit(Xtrain, y_train)
             
             # Compute predictions
-            y_preds = clf.predict_proba(X_valid)[:,1]
+            y_preds = clf.predict_proba(Xvalid)[:,1]
             
             # Compute model metric
             oof_logloss.append(model_metric(y_valid, y_preds))

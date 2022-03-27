@@ -9,10 +9,13 @@ import numpy as np
 from src import config, preprocess, utils
 from scipy.signal import find_peaks
 from scipy.ndimage.filters import gaussian_filter1d
+from scipy.stats import spearmanr
+
 from sklearn.metrics import auc
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 import gc
+from termcolor import colored
 
 
 # BENCHMARK FEATURES
@@ -126,8 +129,55 @@ def features_ion_duration_maxtemp(df_meta, file_paths, ion_list):
     
     return df
         
-
+    
+    
 # ===== FIND PEAKS =====
+
+def get_reference_peak(df_sample):
+    """
+    Find the ion with the peak with the max abundance in the sample.    
+    Sample should be preprocessed.
+    
+    Which ions mass/charge represent a reference peak in the sample.
+    1. Find peaks for each ion m/z
+    2. Get the max abundance of each ion m/z in case there are more than one
+    3. Get the ion with the max abundance
+    4. Return that ion m/z
+    """
+    
+    max_peak_ion = 0
+    peak_abund = 0
+    
+    # Get the list of ions present in the sample
+    ion_list = list(df_sample['m/z'].unique())
+    
+    for ion in ion_list: 
+        # Select data only for one ion m/z
+        temp_dt = df_sample[df_sample['m/z'] == ion].copy()
+        
+        # Apply Gaussian filter for the values
+        temp_dt['abun_minsub_scaled_filtered'] = gaussian_filter1d(temp_dt['abun_minsub_scaled'], 
+                                                                sigma=4)
+        
+        # Compute the median for the prominence ("the minimum height necessary 
+        # to descend to get from the summit to any higher terrain")
+        med = temp_dt['abun_minsub_scaled_filtered'].median()
+        
+        # Find peaks - return index of the peak
+        peaks, _ = find_peaks(temp_dt['abun_minsub_scaled_filtered'], 
+                              prominence=med)
+
+        if len(peaks) > 0:
+            for peak in peaks:
+                  ma = temp_dt.iloc[peak]['abun_minsub_scaled']
+                  if ma > peak_abund:
+                      peak_abund = ma
+                      max_peak_ion = ion
+                      
+    return max_peak_ion
+    
+    
+    
 def compute_ion_peaks(metadata, sample_idx, ion_list):
     
     # Select a sample and get sample name
@@ -140,6 +190,7 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
     # Compute stats and save in dict for each ion type
     ion_peaks_cnt = {} # Initialize dictionary to save calculated values
     for ion in ion_list:
+        #print(colored(f'ION: {ion}','blue'))
         ion_peaks_info = [] # initialize list to store stats per ion type
         
         temp_dt = df_sample[df_sample['m/z'] == ion].copy()
@@ -156,8 +207,10 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
         peaks, _ = find_peaks(temp_dt['abun_minsub_scaled_filtered'], 
                               prominence=med)
         ion_peaks_info.append(len(peaks))
+        if len(peaks) > 0: print(f'\nIon: {ion}, Peaks: {peaks}')
         
         # Peak statistics
+        #TODO Add distance from peaks
         peak_temp = []
         peak_time = []
         peak_abund = []
@@ -165,7 +218,8 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
             tm = temp_dt.iloc[i]['time']; peak_time.append(tm) 
             t = temp_dt.iloc[i]['temp']; peak_temp.append(t)
             a = temp_dt.iloc[i]['abun_minsub_scaled']; peak_abund.append(a)
-        
+            if len(peaks) > 0: print(f'Peak {i} Abund: {a}')
+            
         if len(peak_time)>0 and len(peak_temp)>0 and len(peak_abund)>0:
             peak_time = max(peak_time)
             peak_temp = max(peak_temp)
@@ -382,7 +436,6 @@ def slope_time_temp(train_files:dict, metadata):
 # ===== TARGET ENCODING =====
 # Target encode each label on instrument type and save
 # as a variable. There should be 11 additional variables
-#TODO Fix to work on CV
 def label_encode(df, 
                  feature:str, 
                  target:str, 
@@ -491,4 +544,53 @@ def get_topN_ions(metadata, N:int=3, normalize:bool=True,
     return temp
 
 
-#
+# ===== CORRELATION =====
+
+
+def corr_peak_mz(df_sample):
+    """
+    Compute nonparametric correlation between the
+    peak and the rest of the m/z values.
+    
+    df_sample: pandas data frame
+        The sample should be processed!
+    """
+    
+    # Check that the length of all ion time series is equal
+    assert len(df_sample.groupby('m/z')['time'].agg('count').unique()) == 1
+
+    # Get the ion list
+    sample_ions = list(df_sample['m/z'].unique())
+    print(f'Number of ions: {len(sample_ions)}')
+    
+    # Correlation df
+    df_corr = pd.DataFrame(index=sample_ions)
+    
+    #TODO Find peaks
+    
+    peaks = [18.0, 17.0]
+    
+    for peak in peaks:
+        ion_i = df_sample[df_sample['m/z'] == peak]['abun_minsub_scaled'].values
+    
+        for j in sample_ions:
+            ion_j = df_sample[df_sample['m/z'] == j]['abun_minsub_scaled'].values
+            
+            # Values mesured in same time intervals for two ions
+            all(df_sample[df_sample['m/z'] == peak]['time'].values == df_sample[df_sample['m/z'] == j]['time'].values)
+
+            sprcorr, _ = spearmanr(ion_i, ion_j)
+            df_corr.loc[j,'Ion_' + str(peak)] = sprcorr
+    
+    #TODO Select ions with significant correlation
+    
+    #TODO Return a list of selected ions
+    
+    return df_corr
+
+
+def filter_mz_corr():
+    """
+    1. Compute peaks for the sample
+    2. 
+    """

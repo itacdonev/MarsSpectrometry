@@ -561,26 +561,27 @@ def corr_peak_mz(df_sample):
 
     # Get the ion list
     sample_ions = list(df_sample['m/z'].unique())
-    print(f'Number of ions: {len(sample_ions)}')
+    #print(f'Number of ions: {len(sample_ions)}')
     
     # Correlation df
     df_corr = pd.DataFrame(index=sample_ions)
     
     # Get the ion with the peak of max abundance
-    peaks = [get_reference_peak(df_sample)]
-    assert len(peaks) == 1
+    ref_peak = get_reference_peak(df_sample)
+    assert len([ref_peak]) == 1
     
-    for peak in peaks:
-        ion_i = df_sample[df_sample['m/z'] == peak]['abun_minsub_scaled'].values
-    
-        for j in sample_ions:
-            ion_j = df_sample[df_sample['m/z'] == j]['abun_minsub_scaled'].values
-            
-            # Values mesured in same time intervals for two ions
-            all(df_sample[df_sample['m/z'] == peak]['time'].values == df_sample[df_sample['m/z'] == j]['time'].values)
+    if ref_peak > 0:
+        for peak in [ref_peak]:
+            ion_i = df_sample[df_sample['m/z'] == peak]['abun_minsub_scaled'].values
+        
+            for j in sample_ions:
+                ion_j = df_sample[df_sample['m/z'] == j]['abun_minsub_scaled'].values
+                
+                # Values mesured in same time intervals for two ions
+                all(df_sample[df_sample['m/z'] == peak]['time'].values == df_sample[df_sample['m/z'] == j]['time'].values)
 
-            sprcorr, _ = spearmanr(ion_i, ion_j)
-            df_corr.loc[j,'Ion_' + str(peak)] = sprcorr
+                sprcorr, _ = spearmanr(ion_i, ion_j)
+                df_corr.loc[j,'Ion_' + str(peak)] = sprcorr
     
     # Select ions with significant correlation
     suffix = ".0"
@@ -595,8 +596,31 @@ def corr_peak_mz(df_sample):
     return corr_ions.tolist()
 
 
-def filter_mz_corr():
+def corr_ions_sig(metadata):
     """
-    1. Compute peaks for the sample
-    2. 
+    Determine a list of ions with high correlation
+    within each sample. Combine list from all samples
+    to create a list for the training set to take into
+    account.
     """
+    
+    # Get the dict of all file paths: TR, VL, TE
+    files_list = metadata['features_path'].to_dict()
+    
+    # Store correlated ions
+    ions_corr = []
+    
+    for i in tqdm(files_list):
+        
+        # Get and preprocess sample
+        df_sample = preprocess.get_sample(metadata,i)
+        df_sample = preprocess.preprocess_samples(df_sample)
+        #print(metadata.iloc[i]['sample_id'])
+        
+        # Compute significantly correlated ions
+        corr_ions = corr_peak_mz(df_sample)
+        ions_corr = list(set(ions_corr) | set(corr_ions))   # Union of two sets
+        #print(ions_corr)
+        
+    return ions_corr
+        

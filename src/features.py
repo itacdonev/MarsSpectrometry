@@ -566,9 +566,9 @@ def corr_peak_mz(df_sample):
     # Correlation df
     df_corr = pd.DataFrame(index=sample_ions)
     
-    #TODO Find peaks
-    
-    peaks = [18.0, 17.0]
+    # Get the ion with the peak of max abundance
+    peaks = [get_reference_peak(df_sample)]
+    assert len(peaks) == 1
     
     for peak in peaks:
         ion_i = df_sample[df_sample['m/z'] == peak]['abun_minsub_scaled'].values
@@ -582,11 +582,17 @@ def corr_peak_mz(df_sample):
             sprcorr, _ = spearmanr(ion_i, ion_j)
             df_corr.loc[j,'Ion_' + str(peak)] = sprcorr
     
-    #TODO Select ions with significant correlation
+    # Select ions with significant correlation
+    suffix = ".0"
+    df_corr.columns = [str(i).removesuffix(suffix) for i in df_corr]
+    df_corr.index = [str(i).removesuffix(suffix) for i in df_corr.index]
+    df_corr_sig = df_corr[df_corr.apply(lambda x: np.abs(x) > 0.6, 
+                                        axis=1) == True].dropna()
     
-    #TODO Return a list of selected ions
-    
-    return df_corr
+    # Return a list of selected ions
+    corr_ions = df_corr_sig.index.astype('float')
+
+    return corr_ions.tolist()
 
 
 def filter_mz_corr():

@@ -1,8 +1,10 @@
 """Preprocess the data"""
 
+from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import minmax_scale
 from src import config, preprocess
 import pandas as pd
+import numpy as np
 from tqdm import tqdm
 
 
@@ -22,7 +24,7 @@ def preprocess_ion_type(df):
     Preprocess sample observations.
     """
     
-    # Fractional values from the SAM testbed
+    # Remove fractional values from the SAM testbed
     df = df[df['m/z'].transform(round) == df['m/z']]
     
     # Remove values of m/z greater than 99
@@ -34,7 +36,7 @@ def preprocess_ion_type(df):
     return df
 
 
-def remove_background_abundance(df):
+def remove_bcg_abund(df):
     """
     Subtracts minimum abundance value
 
@@ -53,6 +55,26 @@ def remove_background_abundance(df):
     return df
 
 
+def detrend_linreg(df_sample):
+    """Detrending the background presence using linear regression."""
+    X = df_sample['time'].values.reshape(-1,1)
+    y = df_sample['abundance'].values
+    
+    model = LinearRegression()
+    model.fit(X,y)
+    
+    trend = model.predict(X)
+    
+    df_sample['abundance_dtrend_lr'] = [y[i] - trend[i] for i in range(0,len(y))]
+    # Replace negative values with zero - can't have neg mass
+    df_sample['abundance_dtrend_lr'] = np.where(df_sample['abundance_dtrend_lr'] < 0, 
+                                                0, 
+                                                df_sample['abundance_dtrend_lr'])
+    
+    return df_sample
+    
+
+
 def scale_abun(df):
     """
     Scale abundance from 0-100 according to the min and max values across entire sample
@@ -65,7 +87,7 @@ def scale_abun(df):
     """
 
     df["abun_minsub_scaled"] = minmax_scale(df["abundance_minsub"].astype(float))
-
+    #TODO Shouldn't this be applied in the CV process???
     del df['abundance_minsub']
     
     return df
@@ -76,7 +98,7 @@ def preprocess_samples(df):
     df = preprocess_ion_type(df)
     
     # Remove background abundance
-    df = remove_background_abundance(df)
+    df = remove_bcg_abund(df)
     
     # MinMax scale abundance
     df = scale_abun(df)

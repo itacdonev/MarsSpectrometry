@@ -179,14 +179,14 @@ def get_reference_peak(df_sample):
     
     
     
-def compute_ion_peaks(metadata, sample_idx, ion_list):
+def compute_ion_peaks(metadata, sample_idx, ion_list, detrend_method):
     
     # Select a sample and get sample name
     df_sample = preprocess.get_sample(metadata, sample_idx)
     sample_name = metadata.iloc[sample_idx]['sample_id']
     
     # Preprocess the sample
-    df_sample = preprocess.preprocess_samples(df_sample)
+    df_sample = preprocess.preprocess_samples(df_sample, detrend_method=detrend_method)
     
     # Compute stats and save in dict for each ion type
     ion_peaks_cnt = {} # Initialize dictionary to save calculated values
@@ -208,7 +208,7 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
         peaks, _ = find_peaks(temp_dt['abun_minsub_scaled_filtered'], 
                               prominence=med)
         ion_peaks_info.append(len(peaks))
-        if len(peaks) > 0: print(f'\nIon: {ion}, Peaks: {peaks}')
+        #if len(peaks) > 0: print(f'\nIon: {ion}, Peaks: {peaks}')
         
         # Peak statistics
         #TODO Add distance from peaks
@@ -219,7 +219,7 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
             tm = temp_dt.iloc[i]['time']; peak_time.append(tm) 
             t = temp_dt.iloc[i]['temp']; peak_temp.append(t)
             a = temp_dt.iloc[i]['abun_scaled']; peak_abund.append(a)
-            if len(peaks) > 0: print(f'Peak {i} Abund: {a}')
+            #if len(peaks) > 0: print(f'Peak {i} Abund: {a}')
             
         if len(peak_time)>0 and len(peak_temp)>0 and len(peak_abund)>0:
             peak_time = max(peak_time)
@@ -263,7 +263,7 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
 
 # Concat all samples together
 # Loop over all files compute peaks and concat together
-def features_ion_peaks(file_paths:dict, metadata, ion_list:list):
+def features_ion_peaks(file_paths:dict, metadata, ion_list:list, detrend_method):
     """
     Combines all computed ion peaks stats from each sample
     into a features data frame.
@@ -272,7 +272,7 @@ def features_ion_peaks(file_paths:dict, metadata, ion_list:list):
     df = pd.DataFrame()
     
     for sample_idx in tqdm(file_paths):
-        ion_peaks_df = compute_ion_peaks(metadata, sample_idx, ion_list)
+        ion_peaks_df = compute_ion_peaks(metadata, sample_idx, ion_list, detrend_method)
         df = pd.concat([df,ion_peaks_df], axis = 0)
     
     # Join multi column index into one separated by -
@@ -409,7 +409,7 @@ def avg_temp_sample(df, df_files):
     
     return df
 
-def slope_time_temp(train_files:dict, metadata):
+def slope_time_temp(train_files:dict, metadata, detrend_method):
     """
     Compute slope of time ~ temp for each sample using
     linear regression. Is there any difference between
@@ -420,7 +420,7 @@ def slope_time_temp(train_files:dict, metadata):
     
     for i in tqdm(train_files):
         ht = preprocess.get_sample(metadata, i)
-        ht = preprocess.preprocess_samples(ht)
+        ht = preprocess.preprocess_samples(ht, detrend_method=detrend_method)
         sample_name = metadata.iloc[i]['sample_id']
         
         lr = LinearRegression(fit_intercept=False, n_jobs=-1)

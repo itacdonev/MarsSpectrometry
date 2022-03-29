@@ -36,7 +36,7 @@ def bin_temp_abund(df_sample, sample_name:str, detrend_method:str):
                                               detrend_method=detrend_method)
     
     # Compute max relative abundance
-    ht = df_sample.groupby(['m/z', 'temp_bin'])['abun_minsub_scaled'].agg('max').reset_index()
+    ht = df_sample.groupby(['m/z', 'temp_bin'])['abun_scaled'].agg('max').reset_index()
     ht = ht.replace(np.nan, 0)
     ht['sample_id'] = sample_name
     ht.columns = ['Ion_type', 'temp_bin', 'max_rel_abund', 'sample_id']
@@ -157,7 +157,7 @@ def get_reference_peak(df_sample):
         temp_dt = df_sample[df_sample['m/z'] == ion].copy()
         
         # Apply Gaussian filter for the values
-        temp_dt['abun_minsub_scaled_filtered'] = gaussian_filter1d(temp_dt['abun_minsub_scaled'], 
+        temp_dt['abun_minsub_scaled_filtered'] = gaussian_filter1d(temp_dt['abun_scaled'], 
                                                                 sigma=4)
         
         # Compute the median for the prominence ("the minimum height necessary 
@@ -170,7 +170,7 @@ def get_reference_peak(df_sample):
 
         if len(peaks) > 0:
             for peak in peaks:
-                  ma = temp_dt.iloc[peak]['abun_minsub_scaled']
+                  ma = temp_dt.iloc[peak]['abun_scaled']
                   if ma > peak_abund:
                       peak_abund = ma
                       max_peak_ion = ion
@@ -197,7 +197,7 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
         temp_dt = df_sample[df_sample['m/z'] == ion].copy()
         
         # Apply Gaussian filter for the values
-        temp_dt['abun_minsub_scaled_filtered'] = gaussian_filter1d(temp_dt['abun_minsub_scaled'], 
+        temp_dt['abun_minsub_scaled_filtered'] = gaussian_filter1d(temp_dt['abun_scaled'], 
                                                                 sigma=4)
         
         # Compute the median for the prominence ("the minimum height necessary 
@@ -218,7 +218,7 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
         for i in peaks:
             tm = temp_dt.iloc[i]['time']; peak_time.append(tm) 
             t = temp_dt.iloc[i]['temp']; peak_temp.append(t)
-            a = temp_dt.iloc[i]['abun_minsub_scaled']; peak_abund.append(a)
+            a = temp_dt.iloc[i]['abun_scaled']; peak_abund.append(a)
             if len(peaks) > 0: print(f'Peak {i} Abund: {a}')
             
         if len(peak_time)>0 and len(peak_temp)>0 and len(peak_abund)>0:
@@ -231,7 +231,7 @@ def compute_ion_peaks(metadata, sample_idx, ion_list):
         # Compute AUC
         #TODO Needs further discussion
         #if not temp_dt.empty:
-        #    area_abund = np.round(auc(temp_dt['temp'],temp_dt['abun_minsub_scaled']),5)
+        #    area_abund = np.round(auc(temp_dt['temp'],temp_dt['abun_scaled']),5)
         #else: area_abund = 0
         
         # Add values
@@ -325,7 +325,7 @@ def dl_time_pivot(metadata, n_sample, max_time):
     # Make a pivot table
     df_pivot = df_sample_agg.pivot(index=['time_bin', 'temp', 'temp_osc_time'],
                                columns='m/z', 
-                               values='abun_minsub_scaled')
+                               values='abun_scaled')
     
     df_pivot = df_pivot.add_prefix('mz_')
     df_pivot.columns = [i.removesuffix('.0') for i in df_pivot.columns]
@@ -517,7 +517,7 @@ def get_topN_ions(metadata, N:int=3, normalize:bool=True,
         
         # Compute top 3 ions by relative abundance
         # Take max of each ion group sort and slice top N
-        top3 = list((hts.groupby('m/z')['abun_minsub_scaled']\
+        top3 = list((hts.groupby('m/z')['abun_scaled']\
                         .agg('max')\
                         .sort_values(ascending=False))\
                             .head(N).index)
@@ -575,10 +575,10 @@ def corr_peak_mz(df_sample):
     
     if ref_peak > 0:
         for peak in [ref_peak]:
-            ion_i = df_sample[df_sample['m/z'] == peak]['abun_minsub_scaled'].values
+            ion_i = df_sample[df_sample['m/z'] == peak]['abun_scaled'].values
         
             for j in sample_ions:
-                ion_j = df_sample[df_sample['m/z'] == j]['abun_minsub_scaled'].values
+                ion_j = df_sample[df_sample['m/z'] == j]['abun_scaled'].values
                 
                 # Values mesured in same time intervals for two ions
                 all(df_sample[df_sample['m/z'] == peak]['time'].values == df_sample[df_sample['m/z'] == j]['time'].values)

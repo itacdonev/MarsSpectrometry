@@ -1,8 +1,11 @@
 from logging import raiseExceptions
+from multiprocessing import Pipe
 from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
+from sklearn.decomposition import PCA
+from sklearn.pipeline import Pipeline
 from termcolor import colored
 from src import config, features, model_selection
 import xgboost as xgb
@@ -220,7 +223,7 @@ def train_full_model(X, df_y,
     label_names = df_y[target]
     #clf_fitted_dict = {}              # fitted classifiers
     #df_te_fitted = pd.DataFrame()     # target encoding
-    
+
     for label in label_names: 
         
         # Select one label   
@@ -269,12 +272,19 @@ def train_full_model(X, df_y,
                                           use_label_encoder = False,
                                           eval_metric = 'logloss')
         elif model_algo == 'XGB_opt':
-            clf = xgb.XGBClassifier(objective = "binary:logistic",
+            clf = Pipeline([('XGB_opt', xgb.XGBClassifier(objective = "binary:logistic",
                                           use_label_encoder = False,
                                           eval_metric = 'logloss',
-                                        learning_rate = 0.09)
+                                        learning_rate = 0.09))])
         elif model_algo == 'SVC':
             clf = svm.SVC(probability=True)
+        elif model_algo == 'PCA-XGB':
+            clf = Pipeline([('PCA', PCA(n_components=config.PCA_COMPONENTS)),
+                            ('XGB_opt', xgb.XGBClassifier(objective = "binary:logistic",
+                                             use_label_encoder = False,
+                                             eval_metric = 'logloss',
+                                             learning_rate = 0.09))])
+            
          
         # ===== FIT THE MODEL FOR LABEL =====
         #print('Fit the model')

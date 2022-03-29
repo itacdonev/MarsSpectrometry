@@ -1,7 +1,7 @@
 """Preprocess the data"""
 
 from sklearn.linear_model import LinearRegression
-from sklearn.preprocessing import minmax_scale
+from sklearn.preprocessing import minmax_scale, PolynomialFeatures
 from src import config, preprocess
 import pandas as pd
 import numpy as np
@@ -74,6 +74,28 @@ def detrend_linreg(df_sample):
     return df_sample
     
 
+def detrend_poly(df_sample,n_degree:int=2):
+    """Detrending the background presence using polynomial
+    regression.
+    """
+    """Detrending the background presence using linear regression."""
+    X = df_sample['time'].values.reshape(-1,1)
+    y = df_sample['abundance'].values
+    
+    pf = PolynomialFeatures(degree=n_degree)
+    Xp = pf.fit_transform(X)
+    
+    lr = LinearRegression()
+    lr.fit(Xp,y)
+    trend = lr.predict(Xp)
+    
+    df_sample['abundance_dtrend_poly'] = [y[i] - trend[i] for i in range(0,len(y))]
+    df_sample['abundance_dtrend_poly'] = np.where(df_sample['abundance_dtrend_poly'] < 0, 
+                                                0, 
+                                                df_sample['abundance_dtrend_poly'])
+    
+    return df_sample
+
 
 def scale_abun(df):
     """
@@ -93,13 +115,18 @@ def scale_abun(df):
     return df
 
 
-def preprocess_samples(df):
+def preprocess_samples(df, detrend_method:str, poly_degree:int=2):
     # Preprocess m/z
     df = preprocess_ion_type(df)
     
-    # Remove background abundance
-    df = remove_bcg_abund(df)
-    
+    if detrend_method == 'min':
+        # Remove background abundance
+        df = remove_bcg_abund(df)
+    elif detrend_method == 'lin_reg':
+        df = detrend_linreg(df)
+    elif detrend_method == 'poly':
+        df =  detrend_poly(df, n_degree=poly_degree)
+        
     # MinMax scale abundance
     df = scale_abun(df)
     

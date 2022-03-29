@@ -47,7 +47,7 @@ def remove_bcg_abund(df):
         dataframe with minimum abundance subtracted for all observations
     """
 
-    df["abundance_minsub"] = df.groupby(["m/z"])["abundance"].transform(
+    df["abundance_detrend"] = df.groupby(["m/z"])["abundance"].transform(
         lambda x: (x - x.min())
     )
     del df['abundance']
@@ -65,11 +65,11 @@ def detrend_linreg(df_sample):
     
     trend = model.predict(X)
     
-    df_sample['abundance_dtrend_lr'] = [y[i] - trend[i] for i in range(0,len(y))]
+    df_sample['abundance_detrend'] = [y[i] - trend[i] for i in range(0,len(y))]
     # Replace negative values with zero - can't have neg mass
-    df_sample['abundance_dtrend_lr'] = np.where(df_sample['abundance_dtrend_lr'] < 0, 
+    df_sample['abundance_detrend'] = np.where(df_sample['abundance_detrend'] < 0, 
                                                 0, 
-                                                df_sample['abundance_dtrend_lr'])
+                                                df_sample['abundance_detrend'])
     
     return df_sample
     
@@ -89,10 +89,10 @@ def detrend_poly(df_sample,n_degree:int=2):
     lr.fit(Xp,y)
     trend = lr.predict(Xp)
     
-    df_sample['abundance_dtrend_poly'] = [y[i] - trend[i] for i in range(0,len(y))]
-    df_sample['abundance_dtrend_poly'] = np.where(df_sample['abundance_dtrend_poly'] < 0, 
+    df_sample['abundance_detrend'] = [y[i] - trend[i] for i in range(0,len(y))]
+    df_sample['abundance_detrend'] = np.where(df_sample['abundance_detrend'] < 0, 
                                                 0, 
-                                                df_sample['abundance_dtrend_poly'])
+                                                df_sample['abundance_detrend'])
     
     return df_sample
 
@@ -108,9 +108,8 @@ def scale_abun(df):
         dataframe with additional column of scaled abundances
     """
 
-    df["abun_minsub_scaled"] = minmax_scale(df["abundance_minsub"].astype(float))
-    #TODO Shouldn't this be applied in the CV process???
-    del df['abundance_minsub']
+    df["abun_scaled"] = minmax_scale(df["abundance_detrend"].astype(float))
+    del df['abundance_detrend']
     
     return df
 

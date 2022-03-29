@@ -20,7 +20,7 @@ from termcolor import colored
 
 # BENCHMARK FEATURES
 # Bin the temp and compute processes max abundance for each bin
-def bin_temp_abund(df_sample, sample_name:str):
+def bin_temp_abund(df_sample, sample_name:str, detrend_method:str):
     """
     Create equal bins for temperature
     Compute max for relative abundance for each bin and ion type
@@ -32,7 +32,8 @@ def bin_temp_abund(df_sample, sample_name:str):
     df_sample['temp_bin'] = pd.cut(df_sample['temp'], bins=temprange)
     
     # Preprocess the sample data
-    df_sample = preprocess.preprocess_samples(df_sample)
+    df_sample = preprocess.preprocess_samples(df_sample, 
+                                              detrend_method=detrend_method)
     
     # Compute max relative abundance
     ht = df_sample.groupby(['m/z', 'temp_bin'])['abun_minsub_scaled'].agg('max').reset_index()
@@ -52,7 +53,7 @@ def bin_temp_abund(df_sample, sample_name:str):
     return ht_pivot
 
 
-def features_iontemp_abun(df_meta, sample_list):
+def features_iontemp_abun(df_meta, sample_list, detrend_method:str):
     
     # Initialize a table to store computed values
     dt = pd.DataFrame(dtype='float64')
@@ -66,7 +67,7 @@ def features_iontemp_abun(df_meta, sample_list):
         #print(sample_name)
         df_sample = preprocess.get_sample(df_meta, i)
         
-        ht_pivot = bin_temp_abund(df_sample, sample_name)
+        ht_pivot = bin_temp_abund(df_sample, sample_name, detrend_method)
         #ion_temp_dict[sample_name] = ht_pivot
         dt = pd.concat([dt, ht_pivot])
     
@@ -557,7 +558,9 @@ def corr_peak_mz(df_sample):
     """
     
     # Check that the length of all ion time series is equal
-    assert len(df_sample.groupby('m/z')['time'].agg('count').unique()) == 1
+    #TODO sample 401 does not have equal time periods
+    #if len(df_sample.groupby('m/z')['time'].agg('count').unique()) != 1:
+    #    print(colored(f'Sample {sample_name} has irregular time intervals across samples.','red'))
 
     # Get the ion list
     sample_ions = list(df_sample['m/z'].unique())

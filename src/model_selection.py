@@ -3,6 +3,8 @@ Model selection
 """
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.decomposition import PCA
+from sklearn.pipeline import Pipeline
 from sklearn import svm
 import xgboost as xgb
 from src import config
@@ -16,10 +18,15 @@ models = {
                              use_label_encoder = False,
                              eval_metric = 'logloss'),
     
-    'XGB_opt': xgb.XGBClassifier(objective = "binary:logistic",
+    'XGB_opt': Pipeline([('XGB_opt', xgb.XGBClassifier(objective = "binary:logistic",
                                  use_label_encoder = False,
                                  eval_metric = 'logloss',
-                                 learning_rate = 0.09),
+                                 learning_rate = 0.09))]),
     
-    'SVC': svm.SVC(probability=True)
+    'SVC': svm.SVC(probability=True),
+    'PCA-XGB': Pipeline([('PCA', PCA(n_components=config.PCA_COMPONENTS)),
+                        ('XGB_opt', xgb.XGBClassifier(objective = "binary:logistic",
+                                            use_label_encoder = False,
+                                            eval_metric = 'logloss',
+                                            learning_rate = 0.09))])
 }

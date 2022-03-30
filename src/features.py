@@ -84,7 +84,7 @@ def features_iontemp_abun(df_meta, sample_list, detrend_method:str):
     return dt
      
 
-def bin_temp_area(df_sample, detrend_method:str):
+def bin_temp_area(df_sample, sample_name, detrend_method:str):
     """
     Compute area for the temp-ion bin.
     """
@@ -114,7 +114,20 @@ def bin_temp_area(df_sample, detrend_method:str):
             bin_areas_dict[bin] = area
         ion_areas_dict[ion] = bin_areas_dict
     
-    return ion_areas_dict
+    
+    # Prepare df so that each row is sample id
+    df_pivot = pd.DataFrame.from_dict(ion_areas_dict)
+    df_pivot.index = df_pivot.index.set_names('temp_bin')
+    df_pivot = df_pivot.reset_index()
+    df_pivot = df_pivot.melt('temp_bin')
+    df_pivot['sample_id'] = sample_name
+    df_pivot = df_pivot.pivot(index='sample_id', 
+                              columns=['variable', 'temp_bin'], 
+                              values='value')
+    df_pivot.columns = df_pivot.columns.map(lambda x: '_'.join([str(i) for i in x]))
+    df_pivot = df_pivot.add_prefix('Ion_')
+    
+    return df_pivot
 
 
 

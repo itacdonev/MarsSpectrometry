@@ -1,7 +1,10 @@
 from cProfile import label
+from pyexpat import features
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.signal import find_peaks
+from scipy.ndimage.filters import gaussian_filter1d
 
 def annotate_countplot(sp, df: pd.DataFrame(), 
                        perc_height:float, font_size:int=10):
@@ -37,12 +40,16 @@ def annotate_countplot(sp, df: pd.DataFrame(),
 def plot_mz_ts(df_sample,col_to_plot:str):
     
     ions = df_sample['m/z'].unique().tolist()
-    
+
     for ion in ions:
-        plt.plot(df_sample[df_sample['m/z'] == ion]['temp'],
-                 df_sample[df_sample['m/z'] == ion][col_to_plot], 
-                 label=ion)
-    #plt.legend()
+        if df_sample[df_sample['m/z'] == ion]['abun_scaled'].max() > 0.1:
+            plt.plot(df_sample[df_sample['m/z'] == ion]['temp'],
+                    df_sample[df_sample['m/z'] == ion][col_to_plot], 
+                    label=ion)
+        else:
+            plt.plot(df_sample[df_sample['m/z'] == ion]['temp'],
+                    df_sample[df_sample['m/z'] == ion][col_to_plot])
+    plt.legend()
     plt.xlabel('Temperature')
     plt.ylabel(col_to_plot)
     plt.title('Time series plot for each m/z ion')

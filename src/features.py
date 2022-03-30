@@ -84,6 +84,40 @@ def features_iontemp_abun(df_meta, sample_list, detrend_method:str):
     return dt
      
 
+def bin_temp_area(df_sample, detrend_method:str):
+    """
+    Compute area for the temp-ion bin.
+    """
+    # Create a series of temperature bins
+    temprange = pd.interval_range(start=-100, end=1500, freq=100)
+    df_sample['temp_bin'] = pd.cut(df_sample['temp'], bins=temprange)
+    
+    # Preprocess the sample data
+    df_sample = preprocess.preprocess_samples(df_sample, 
+                                              detrend_method=detrend_method)
+    
+    ion_list = df_sample['m/z'].unique().tolist()
+    bin_list = df_sample['temp_bin'].unique().tolist()
+    
+    # Loop over all m/z ions:
+    ion_areas_dict = {}
+    for ion in tqdm(ion_list):    
+        tempdf = df_sample[df_sample['m/z'] == ion].copy()
+        bin_areas_dict = {}
+        for bin in bin_list:
+            dtt = tempdf[tempdf.temp_bin == bin].copy()
+            # Area of the abundance
+            dtt = dtt.sort_values(by=['time', 'abun_scaled'])
+            x = dtt['time'].values
+            y = dtt['abun_scaled'].values
+            area = np.trapz(y=y,x=x)
+            bin_areas_dict[bin] = area
+        ion_areas_dict[ion] = bin_areas_dict
+    
+    return ion_areas_dict
+
+
+
 # ===== Duration to max temperature per ion =====
 def ion_duration_maxtemp(df_sample, ion_list):
     
@@ -449,7 +483,7 @@ def slope_time_temp(train_files:dict, metadata, detrend_method):
         ht = preprocess.preprocess_samples(ht, detrend_method=detrend_method)
         sample_name = metadata.iloc[i]['sample_id']
         
-        lr = LinearRegression(fit_intercept=False, n_jobs=-1)
+        lr = LinearRegression()
         
         X = np.array(ht['time']).reshape(-1, 1)
         y = ht['temp'].values

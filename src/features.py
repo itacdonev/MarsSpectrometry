@@ -107,8 +107,8 @@ def bin_temp_area(df_sample, detrend_method:str):
         for bin in bin_list:
             dtt = tempdf[tempdf.temp_bin == bin].copy()
             # Area of the abundance
-            dtt = dtt.sort_values(by=['time', 'abun_scaled'])
-            x = dtt['time'].values
+            dtt = dtt.sort_values(by=['temp', 'abun_scaled'])
+            x = dtt['temp'].values
             y = dtt['abun_scaled'].values
             area = np.trapz(y=y,x=x)
             bin_areas_dict[bin] = area

@@ -280,6 +280,32 @@ def features_ion_peaks(file_paths:dict, metadata, ion_list:list, detrend_method)
     
     return df
 
+# ===== AREAS =====
+
+def sample_abund_area(metadata, idx, detrend_method):
+    # Compute the area under the abun_scaled for
+    # the whole sample
+    df_sample = preprocess.get_sample(metadata, idx)
+    df_sample = preprocess.preprocess_samples(df_sample, detrend_method=detrend_method)
+    df_sample = df_sample.sort_values(by=['time', 'abun_scaled'])
+    
+    x = df_sample['time'].values
+    y = df_sample['abun_scaled'].values
+    area = np.trapz(y=y,x=x)
+    
+    return area
+
+def features_area(files, metadata, detrend_method):
+    
+    areas_dict = {}
+    
+    for idx in tqdm(files):
+        sample_name = metadata.iloc[idx]['sample_id']
+        area_sample = sample_abund_area(metadata, idx, detrend_method)
+        areas_dict[idx] = area_sample
+        
+    return areas_dict
+        
 
 # ===== DEEP LEARNING =====
 def dl_time_pivot(metadata, n_sample, max_time):

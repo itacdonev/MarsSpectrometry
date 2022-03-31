@@ -1,5 +1,6 @@
 """Feature engineering"""
 
+from __future__ import annotations
 
 from calendar import c
 from importlib.metadata import metadata
@@ -16,6 +17,7 @@ from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 import gc
 from termcolor import colored
+
 
 
 # BENCHMARK FEATURES
@@ -101,7 +103,7 @@ def bin_temp_area(df_sample, sample_name, detrend_method:str):
     
     # Loop over all m/z ions:
     ion_areas_dict = {}
-    for ion in tqdm(ion_list):    
+    for ion in ion_list:    
         tempdf = df_sample[df_sample['m/z'] == ion].copy()
         bin_areas_dict = {}
         for bin in bin_list:
@@ -121,16 +123,47 @@ def bin_temp_area(df_sample, sample_name, detrend_method:str):
     df_pivot = df_pivot.reset_index()
     df_pivot = df_pivot.melt('temp_bin')
     df_pivot['sample_id'] = sample_name
+    df_pivot['temp_bin'] = df_pivot['temp_bin'].astype('str')
     df_pivot = df_pivot.pivot(index='sample_id', 
                               columns=['variable', 'temp_bin'], 
                               values='value')
     df_pivot.columns = df_pivot.columns.map(lambda x: '_'.join([str(i) for i in x]))
     df_pivot = df_pivot.add_prefix('Ion_')
+    df_pivot = df_pivot.reset_index().rename_axis(None, axis=1)
     
     return df_pivot
 
 
+def features_iontemp_area(df_meta, sample_list, detrend_method:str):
+    # Initialize a table to store computed values
+    dt = pd.DataFrame(dtype='float64')
+    
+    # Loop over all sample_id and compute. Add computation to dt.
+    print(f'Number of samples: {len(sample_list)}')
+    for i in sample_list:
+        print(f'Sample: {i}')
+        sample_name = df_meta.iloc[i]['sample_id']
+        #print(sample_name)
+        df_sample = preprocess.get_sample(df_meta, i)
+        
+        ht_pivot = bin_temp_area(df_sample, sample_name, detrend_method)
+        #ion_temp_dict[sample_name] = ht_pivot
+        dt = pd.concat([dt, ht_pivot])
+    
+    dt = dt.set_index('sample_id')
+    
+    # Rename columns
+    t_cols = dt.columns
+    remove_chars = "(,]"
+    for char in remove_chars:
+        t_cols = [i.replace(char,'') for i in t_cols]
+    t_cols = [i.replace(' ','_') for i in t_cols]
+    dt.columns = t_cols
 
+    return dt.fillna(0)
+    
+    
+    
 # ===== Duration to max temperature per ion =====
 def ion_duration_maxtemp(df_sample, ion_list):
     

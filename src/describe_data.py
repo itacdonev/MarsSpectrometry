@@ -66,8 +66,12 @@ def plot_ms(df_sample, col_to_plot:str, target:str=None, sample_id:str=None):
     for ion in ion_list:
         temp = df_sample[df_sample['m/z'] == ion]
         y = temp[col_to_plot].max()
-        plt.plot([ion,ion], [0,y], c='#2D4B73')
+        if y > 0.01:
+            plt.plot([ion,ion], [0,y], label=ion)
+        else:
+            plt.plot([ion,ion], [0,y], c='#2D4B73')
     
+    plt.legend()
     plt.title(f'Sample: {sample_id}   Target: {target}')
     plt.xlabel('m/z ion')
     sns.despine()

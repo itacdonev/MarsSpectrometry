@@ -86,7 +86,25 @@ def features_iontemp_abun(df_meta, sample_list, detrend_method:str):
     return dt
      
 
-def bin_temp_area(df_sample, sample_name, detrend_method:str):
+def filter_areas_tempion(df, area_thrs):
+    """
+    Filter all the ions where the areas in all
+    of the temperature bins is less than area_thrs.
+    """
+    dft = df.copy()
+    #print(f'Original shape: {dft.shape}')
+    for col in dft:
+        if all(dft[col] < area_thrs):
+            #dft[col] = 0
+            del dft[col]
+    #print(f'Final shape: {dft.shape}')
+    
+    return dft
+
+
+def bin_temp_area(df_sample, sample_name, detrend_method:str, 
+                  to_pivot:bool=True, filter_ions:bool=False, 
+                  area_thrs:float=1.0):
     """
     Compute area for the temp-ion bin.
     """
@@ -116,37 +134,45 @@ def bin_temp_area(df_sample, sample_name, detrend_method:str):
             bin_areas_dict[bin] = area
         ion_areas_dict[ion] = bin_areas_dict
     
+    if to_pivot:
+        # Prepare df so that each row is sample id
+        df_pivot = pd.DataFrame.from_dict(ion_areas_dict)
+        df_pivot.index = df_pivot.index.set_names('temp_bin')
+        
+        if filter_ions:
+            df_pivot = filter_areas_tempion(df_pivot, area_thrs)
+        
+        df_pivot = df_pivot.reset_index()
+        df_pivot = df_pivot.melt('temp_bin')
+        df_pivot['sample_id'] = sample_name
+        df_pivot['temp_bin'] = df_pivot['temp_bin'].astype('str')
+        df_pivot = df_pivot.pivot(index='sample_id', 
+                                columns=['variable', 'temp_bin'], 
+                                values='value')
+        df_pivot.columns = df_pivot.columns.map(lambda x: '_'.join([str(i) for i in x]))
+        df_pivot = df_pivot.add_prefix('Ion_')
+        df_pivot = df_pivot.reset_index().rename_axis(None, axis=1)
+        return df_pivot
+    else:
+        return ion_areas_dict
     
-    # Prepare df so that each row is sample id
-    df_pivot = pd.DataFrame.from_dict(ion_areas_dict)
-    df_pivot.index = df_pivot.index.set_names('temp_bin')
-    df_pivot = df_pivot.reset_index()
-    df_pivot = df_pivot.melt('temp_bin')
-    df_pivot['sample_id'] = sample_name
-    df_pivot['temp_bin'] = df_pivot['temp_bin'].astype('str')
-    df_pivot = df_pivot.pivot(index='sample_id', 
-                              columns=['variable', 'temp_bin'], 
-                              values='value')
-    df_pivot.columns = df_pivot.columns.map(lambda x: '_'.join([str(i) for i in x]))
-    df_pivot = df_pivot.add_prefix('Ion_')
-    df_pivot = df_pivot.reset_index().rename_axis(None, axis=1)
-    
-    return df_pivot
 
 
-def features_iontemp_area(df_meta, sample_list, detrend_method:str):
+def features_iontemp_area(df_meta, sample_list, detrend_method:str,
+                          filter_ions:bool=False, area_thrs:float=1.0):
     # Initialize a table to store computed values
     dt = pd.DataFrame(dtype='float64')
     
     # Loop over all sample_id and compute. Add computation to dt.
-    print(f'Number of samples: {len(sample_list)}')
+    #print(f'Number of samples: {len(sample_list)}')
     for i in sample_list:
-        print(f'Sample: {i}')
+        #print(f'Sample: {i}')
         sample_name = df_meta.iloc[i]['sample_id']
         #print(sample_name)
         df_sample = preprocess.get_sample(df_meta, i)
         
-        ht_pivot = bin_temp_area(df_sample, sample_name, detrend_method)
+        ht_pivot = bin_temp_area(df_sample, sample_name, detrend_method,
+                                 filter_ions, area_thrs)
         #ion_temp_dict[sample_name] = ht_pivot
         dt = pd.concat([dt, ht_pivot])
     

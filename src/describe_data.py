@@ -42,7 +42,7 @@ def plot_mz_ts(df_sample,col_to_plot:str):
     ions = df_sample['m/z'].unique().tolist()
 
     for ion in ions:
-        if df_sample[df_sample['m/z'] == ion]['abun_scaled'].max() > 0.1:
+        if df_sample[df_sample['m/z'] == ion]['abun_scaled'].max() > 0.01:
             plt.plot(df_sample[df_sample['m/z'] == ion]['temp'],
                     df_sample[df_sample['m/z'] == ion][col_to_plot], 
                     label=ion)

@@ -235,8 +235,49 @@ def features_ion_duration_maxtemp(df_meta, file_paths, ion_list):
     del df['Ion_4.0']
     
     return df
+
+
+
         
+# ===== MOLECULAR ION DETECTION =====
+
+def get_all_peaks(df_sample):
+    """
+    Taking all m/z ions and their intensities select all
+    m/z ions greater than some threshold.
+    """
+    # get max for each m/z ion
+    df_mra_mz = df_sample.groupby('m/z')['abun_scaled'].agg('max')
     
+    # Compute threshold as 1% of the maximum abundance in the sample
+    abun_thrs = np.round(df_mra_mz.max()) * config.INTENSITY_THRESHOLD
+    
+    # Select only m/z ions with max abundance greater than the threshold
+    df_mra_mz = df_mra_mz[df_mra_mz > abun_thrs]
+
+    return df_mra_mz
+    
+
+def get_molecular_ion(df_sample):
+    """
+    Find molecular ion from the sample.
+    Sample should be processed.
+    """
+    
+    # Get all peaks above a threshold
+    df_mra_mz = get_all_peaks(df_sample)
+    
+    # Select the ion with the greatest mass
+    df_mra_mz = df_mra_mz.reset_index()
+    df_mra_mz = df_mra_mz[df_mra_mz['m/z'] == df_mra_mz['m/z'].max()]
+    
+    Mp = df_mra_mz.iloc[0]['m/z']
+    Mp_mra = df_mra_mz.iloc[0]['abun_scaled']
+    
+    return Mp, Mp_mra
+
+
+   
     
 # ===== FIND PEAKS =====
 

@@ -28,7 +28,7 @@ def preprocess_ion_type(df):
     df = df[df['m/z'].transform(round) == df['m/z']]
     
     # Remove values of m/z greater than 99
-    df = df[df['m/z'] < 100]
+    df = df[df['m/z'] < 150]
     
     # Remove all observations of the Helium carrier gas
     df = df[df['m/z'] != 4]

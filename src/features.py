@@ -427,12 +427,50 @@ def features_ms(metadata, file_list, detrend_method):
         
 # ===== STATISTICS =====
 
-def get_mz_stats(df_sample):
-    return df_sample.groupby('m/z').agg({'abun_scaled': ['mean', 'median', 'std', 
-                                                         pd.DataFrame.kurtosis,
-                                                         pd.DataFrame.skew]})
+def get_mz_stats(df_sample, sample_name):
+    
+    sample_stats = df_sample.groupby('m/z')\
+        .agg({'abun_scaled': ['mean', 'median', 'std',
+                               pd.DataFrame.kurtosis,
+                               pd.DataFrame.skew]})
+    sample_stats = sample_stats.droplevel(level=0, axis=1).reset_index()
+    sample_stats['sample_id'] = sample_name
+    
+    return sample_stats
 
-            
+
+def features_mz_stats(metadata, file_list, detrend_method):
+    """
+    Statistics for each m/z.
+    """
+    df = pd.DataFrame()
+    
+    for file_idx in tqdm(file_list): #idx
+        #print(file_idx)
+        temp = {}
+        
+        # Select a sample and get sample name
+        df_sample = preprocess.get_sample(metadata, file_idx)
+        sample_name = metadata.iloc[file_idx]['sample_id']
+        temp['sample_id'] = sample_name
+        
+        # Preprocess the sample
+        df_sample = preprocess.preprocess_samples(df_sample, 
+                                                detrend_method=detrend_method)
+        
+        # Statistics
+        sample_stats = get_mz_stats(df_sample, sample_name)
+        
+        # Prepare the df
+        stats_pivot = sample_stats.pivot(index='sample_id', columns='m/z')
+        df = pd.concat([df, stats_pivot], axis=0)
+    
+    df = df.fillna(0)
+    df.columns = df.columns.map(lambda x: '_'.join([str(i) for i in x]))
+    
+    return df
+
+      
 # ===== FIND PEAKS =====
 
 def get_reference_peak(df_sample):

@@ -245,6 +245,7 @@ def get_all_peaks(df_sample):
     """
     Taking all m/z ions and their intensities select all
     m/z ions greater than some threshold.
+    Sample should be processed.
     """
     # get max for each m/z ion
     df_mra_mz = df_sample.groupby('m/z')['abun_scaled'].agg('max')
@@ -271,14 +272,167 @@ def get_molecular_ion(df_sample):
     df_mra_mz = df_mra_mz.reset_index()
     df_mra_mz = df_mra_mz[df_mra_mz['m/z'] == df_mra_mz['m/z'].max()]
     
-    Mp = df_mra_mz.iloc[0]['m/z']
-    Mp_mra = df_mra_mz.iloc[0]['abun_scaled']
+    M = df_mra_mz.iloc[0]['m/z']
+    M_mra = df_mra_mz.iloc[0]['abun_scaled']
     
-    return Mp, Mp_mra
+    return M, M_mra
 
 
+def nitrogen_rule(df_sample):
+    #TODO Finish up - not clear - turn out that most of our 
+    # samples have N
+    M, _ = get_molecular_ion(df_sample)
+    
+    if M % 2 == 0:
+        M_nitro = 1 # even
+    else:
+        M_nitro = 0 # odd
+        
+    return M_nitro
+
+
+def get_Mp1_peak(df_sample):
+    """
+    Check whether there is an [M+1] peak and record the m/z value and the 
+    mra.
+    Sample should be processed.
+    """
+    
+    M, M_mra = get_molecular_ion(df_sample)
+    
+    Mp1 = M+1
+    
+    Mp1_mra = df_sample[df_sample['m/z'] == Mp1]['abun_scaled'].max()
+    
+    Mp1_isotope = (Mp1_mra/M_mra)*100
+    
+    return Mp1_mra, Mp1_isotope
    
+
+def get_Mp2_peak(df_sample):
+    """
+    Check whether there is an [M+2] peak and record the m/z value and the 
+    mra.
+    Sample should be processed.
+    """
+    M, M_mra = get_molecular_ion(df_sample)
+    Mp2 = M+2
+    Mp2_mra = df_sample[df_sample['m/z'] == Mp2]['abun_scaled'].max()
+    Mp2_isotope = (Mp2_mra/M_mra)*100
     
+    return Mp2_mra, Mp2_isotope
+    
+
+def get_no_carbons(df_sample):
+    """
+    Compute number of carbons.
+    Sample should be processed.
+    """
+    _, M_mra = get_molecular_ion(df_sample)
+    Mp1_mra, Mp1_isotope = get_Mp1_peak(df_sample)
+    
+    return np.round((Mp1_mra/M_mra) * (100/1.1),2)
+    
+   
+def get_moli_frag_peak_diff(df_sample):
+    """
+    Compute the difference in mass from the molecular peak 
+    to the first closest fragment.
+    Sample should be processed.
+    """
+    # Compute all peaks
+    df_sample_all_peaks = get_all_peaks(df_sample)
+    
+    mz_values = df_sample_all_peaks.reset_index().tail(2)['m/z'].values
+    
+    return mz_values[1] - mz_values[0]
+    
+     
+    
+def features_ms(metadata, file_list, detrend_method):
+    """Features from mass spectra.
+    """
+    df = pd.DataFrame()
+    
+    for file_idx in tqdm(file_list): #idx
+        #print(file_idx)
+        temp = {}
+        
+        # Select a sample and get sample name
+        df_sample = preprocess.get_sample(metadata, file_idx)
+        sample_name = metadata.iloc[file_idx]['sample_id']
+        temp['sample_id'] = sample_name
+        
+        # Preprocess the sample
+        df_sample = preprocess.preprocess_samples(df_sample, 
+                                                detrend_method=detrend_method)
+        
+        # Molecular ion and its abundance
+        M, M_mra = get_molecular_ion(df_sample)
+        temp['M'] = M
+        temp['M_mra'] = M_mra 
+        temp = pd.DataFrame(data=temp, index=[0])
+        
+        # Isotopic abundance [M+1]
+        Mp1_mra, Mp1_isotope = get_Mp1_peak(df_sample)
+        temp['Mp1_mra'] = Mp1_mra
+        temp['Mp1_isotope'] = np.round(Mp1_isotope,2)
+        
+        # Isotopic abundance [M+2]
+        Mp2_mra, Mp2_isotope = get_Mp2_peak(df_sample)
+        temp['Mp2_mra'] = Mp2_mra
+        temp['Mp2_isotope'] = np.round(Mp2_isotope,2)
+        
+        
+        # 1st heavy isotopes
+        if np.round(Mp1_isotope,3) in pd.Interval(0.014,0.016, closed='both'): temp['hi1'] = 1. #'H'
+        elif np.round(Mp1_isotope,1) in pd.Interval(1.0,1.2, closed='both'): temp['hi1'] =  12. #'C'
+        elif np.round(Mp1_isotope,2) in pd.Interval(0.36,0.38, closed='both'): temp['hi1'] =  14. #'N'
+        elif np.round(Mp1_isotope,2) in pd.Interval(0.03,0.05, closed='both'): temp['hi1'] =  16. #'O'
+        elif np.round(Mp1_isotope,1) in pd.Interval(5.0,5.2, closed='both'): temp['hi1'] =  28. #'Si'
+        elif np.round(Mp1_isotope,1) in pd.Interval(0.7,0.9, closed='both'): temp['hi1'] =  32. #'S'
+        else: temp['hi1'] = ''
+        
+        # 2nd heavy isotopes
+        if np.round(Mp2_isotope,1) in pd.Interval(0.1, 0.3, closed='both'): temp['hi2'] = 16. #'O'
+        elif np.round(Mp2_isotope,1) in pd.Interval(3.3, 3.5, closed='both'): temp['hi2'] =  28. #'Si'
+        elif np.round(Mp2_isotope,1) in pd.Interval(4.3, 4.5, closed='both'): temp['hi2'] =  32. #'S'
+        elif np.round(Mp2_isotope,1) in pd.Interval(32.4,32.6, closed='both'): temp['hi2'] =  35.5 #'Cl'
+        elif np.round(Mp2_isotope,1) in pd.Interval(97.9,98.1, closed='both'): temp['hi2'] =  79.9 #'Br'
+        else: temp['hi2'] = ''
+        
+        #TODO Adjusted M+1 and M+2
+        
+        # Number of carbons
+        #TODO Needs correction if there are present 1st and 2nd isotopes
+        temp['C_cnt'] = get_no_carbons(df_sample)
+        
+        
+        # Presence of nitrogen
+        # an even molecular ion indicates the sample lacks nitrogen
+        #N_cnt = nitrogen_rule(df_sample)
+        #temp['N_cnt'] = N_cnt
+            
+        # Difference between molecular ion and its first fragment peak
+        mi_frg_diff = get_moli_frag_peak_diff(df_sample)
+        temp['mi_frg_diff'] = mi_frg_diff
+        
+        
+        
+            
+        df = pd.concat([df, temp], axis=0)
+    
+    return df.reset_index(drop=True)
+        
+        
+# ===== STATISTICS =====
+
+def get_mz_stats(df_sample):
+    return df_sample.groupby('m/z').agg({'abun_scaled': ['mean', 'median', 'std', 
+                                                         pd.DataFrame.kurtosis,
+                                                         pd.DataFrame.skew]})
+
+            
 # ===== FIND PEAKS =====
 
 def get_reference_peak(df_sample):
@@ -333,7 +487,8 @@ def compute_ion_peaks(metadata, sample_idx, ion_list, detrend_method):
     sample_name = metadata.iloc[sample_idx]['sample_id']
     
     # Preprocess the sample
-    df_sample = preprocess.preprocess_samples(df_sample, detrend_method=detrend_method)
+    df_sample = preprocess.preprocess_samples(df_sample, 
+                                              detrend_method=detrend_method)
     
     # Compute stats and save in dict for each ion type
     ion_peaks_cnt = {} # Initialize dictionary to save calculated values

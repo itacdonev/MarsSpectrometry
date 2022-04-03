@@ -1,5 +1,6 @@
 """Global variables to be used for the project.
 """
+import pandas as pd
 
 # GLOBAL VARIABLES
 DATA_DIR = '../input/'

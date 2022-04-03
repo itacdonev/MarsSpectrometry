@@ -9,11 +9,12 @@ from sklearn.pipeline import Pipeline
 from termcolor import colored
 from src import config, features, model_selection
 import xgboost as xgb
+from xgboost import plot_importance
 import numpy as np
 import pandas as pd
 import os
 from sklearn import svm
-
+import matplotlib.pyplot as plt
 
 def define_cvfolds(df, no_folds, SEED:int, 
                    group:str=None, strata:str=None):
@@ -227,7 +228,7 @@ def train_full_model(X, df_y,
     for label in label_names: 
         
         # Select one label   
-        #print(colored(f'LABEL: {label}', 'blue'))
+        print(colored(f'LABEL: {label}', 'blue'))
         y = df_y[label].copy().values
 
         # ----- TARGET ENCODING -----        
@@ -272,10 +273,10 @@ def train_full_model(X, df_y,
                                           use_label_encoder = False,
                                           eval_metric = 'logloss')
         elif model_algo == 'XGB_opt':
-            clf = Pipeline([('XGB_opt', xgb.XGBClassifier(objective = "binary:logistic",
+            clf = xgb.XGBClassifier(objective = "binary:logistic",
                                           use_label_encoder = False,
                                           eval_metric = 'logloss',
-                                        learning_rate = 0.09))])
+                                        learning_rate = 0.09)
         elif model_algo == 'SVC':
             clf = svm.SVC(probability=True)
         elif model_algo == 'PCA-XGB':
@@ -290,7 +291,9 @@ def train_full_model(X, df_y,
         #print('Fit the model')
         #clf_fitted_dict[label] = clf.fit(Xtrain, y)
         clf.fit(Xtrain, y)
-        
+        _,ax = plt.subplots(1,1,figsize=(10,10))
+        plot_importance(clf, max_num_features=25, ax=ax)
+        plt.show()
         # Make predictions
         submission[label] = clf.predict_proba(Xtest)[:,1]
         
@@ -352,3 +355,24 @@ def train_tbl(df_train, df_labels,
     print(train_cv_loss)
     
     return train_cv_loss, submission
+
+
+def compute_valid_loss(submission_file_VT, valid_files, 
+                       valid_labels, target_label_list):
+    """
+    Compute validation loss.
+    Model is trained only on TRAIN data set.
+    Predictions are computed on the VALID data set.
+    """
+    df_sub = submission_file_VT.iloc[:len(submission_file_VT),:]
+    print(df_sub.shape)
+    
+    model_ll = {}
+    for label in target_label_list:
+        y_actual = valid_labels[label].iloc[:len(valid_files)]
+        y_preds = df_sub[label].iloc[:len(valid_files)]
+        model_ll[label] = log_loss(y_actual, y_preds)
+        
+    print(f'Average Log Loss of full model: {np.mean(list(model_ll.values()))}')
+    
+    return model_ll, np.mean(list(model_ll.values()))

@@ -800,6 +800,69 @@ def slope_time_temp(train_files:dict, metadata, detrend_method):
     return coefs_lr
 
 
+
+# ===== TEMPERATURE QUANTILE =====
+   
+def features_temp_qcut(df_all, 
+                       split:str='train',
+                       no_quantiles:int=10, 
+                       precision:int=0,
+                       tr_bins=None):
+    """
+    Compute defined measures given temperature bin.
+    The temperature bin is computed using qcut with
+    q=10, i.e. the deciles. The binning is calculated
+    for each m/z ratio.
+    All the sample should be preprocessed.
+    
+    df_all (pandas data frame) data frame of all time series
+            data stacked in rows.
+    split (string; 'train','valid'; default='train')
+            
+    """
+    #TODO Nede to write a sklearn fit_transform class to use transform
+    # for the validation & test set
+    
+    if split in ['train']:
+        tempD, tr_bins = pd.qcut(df_all['temp'], 
+                                    q=no_quantiles, 
+                                    precision=precision,
+                                    retbins=True)
+        df_all['TEMP_D'] = tempD
+    else:
+        df_all['TEMP_D'] = pd.cut(df_all["temp"], 
+                                  bins=tr_bins, 
+                                  include_lowest=True)
+        
+    # Compute features
+    ion_stats = df_all.groupby(['sample_id', 'm/z', 'TEMP_D'])\
+                            .agg({'time': ['max', np.ptp],
+                                'temp': ['max', np.ptp],
+                                'abun_scaled': ['mean', 'max', np.ptp]})\
+                            .fillna(0)
+    #TODO Add slope of the abun and temp curve for the bin
+        
+    
+    ion_stats = ion_stats.reset_index()
+        
+    df_fts_pivot = ion_stats.pivot(index='sample_id', columns=['TEMP_D', 'm/z'])
+    df_fts_pivot.columns = df_fts_pivot.columns.map(lambda x: '_'.join([str(i) for i in x]))
+    # Rename columns
+    t_cols = df_fts_pivot.columns
+    remove_chars = "(,]"
+    for char in remove_chars:
+        t_cols = [i.replace(char,'') for i in t_cols]
+    t_cols = [i.replace(' ','_') for i in t_cols]
+    df_fts_pivot.columns = t_cols
+    
+    if split in ['train']:
+        return df_fts_pivot, tr_bins
+    else:
+        return df_fts_pivot
+
+
+
+
 # ===== TARGET ENCODING =====
 # Target encode each label on instrument type and save
 # as a variable. There should be 11 additional variables

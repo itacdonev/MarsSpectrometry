@@ -8,6 +8,30 @@ import numpy as np
 from tqdm import tqdm
 
 
+
+def combine_samples(file_paths, metadata, 
+                    detrend_method,
+                    add_target:bool=False,
+                    y_labels=None):
+    """Combine sample into one data frame."""
+    df = pd.DataFrame()
+    for file in tqdm(file_paths):
+        df_sample = preprocess.get_sample(metadata, file)
+        df_sample = preprocess.preprocess_samples(df_sample, detrend_method=detrend_method)
+        sample_name = metadata.iloc[file]['sample_id']
+        df_sample['sample_id'] = sample_name
+        df_sample['split'] = metadata.iloc[file]['split']
+        if add_target:
+            y = y_labels.iloc[file]['target']
+            if len(y) > 0:
+                df_sample['target'] = y[0]
+            else: 
+                df_sample['target'] = ''
+        df = pd.concat([df, df_sample], axis=0)
+    return df
+
+
+
 def get_sample(df_meta, i, verbose:bool=False):
     """Load one sample"""
     sample_file = df_meta.iloc[i]['features_path']
@@ -28,7 +52,7 @@ def preprocess_ion_type(df):
     df = df[df['m/z'].transform(round) == df['m/z']]
     
     # Remove values of m/z greater than 99
-    df = df[df['m/z'] < 150]
+    df = df[df['m/z'] < config.MZ_THRESHOLD]
     
     # Remove all observations of the Helium carrier gas
     df = df[df['m/z'] != 4]

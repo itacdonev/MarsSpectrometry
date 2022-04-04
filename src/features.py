@@ -22,7 +22,12 @@ from termcolor import colored
 
 # BENCHMARK FEATURES
 # Bin the temp and compute processes max abundance for each bin
-def bin_temp_abund(df_sample, sample_name:str, detrend_method:str):
+def bin_temp_abund(df_sample, sample_name:str, detrend_method:str,
+                   remove_mz_cnt:bool=False, remove_mz_thrs=None,
+                   smooth:bool=False,
+                    smoothing_type:str='gauss',
+                    gauss_sigma:int=5,
+                    ma_step:int=None):
     """
     Create equal bins for temperature
     Compute max for relative abundance for each bin and ion type
@@ -35,10 +40,20 @@ def bin_temp_abund(df_sample, sample_name:str, detrend_method:str):
     
     # Preprocess the sample data
     df_sample = preprocess.preprocess_samples(df_sample, 
-                                              detrend_method=detrend_method)
+                                              detrend_method=detrend_method,
+                                              remove_mz_cnt=remove_mz_cnt,
+                                              remove_mz_thrs=remove_mz_thrs,
+                                              smooth=smooth,
+                                              smoothing_type=smoothing_type,
+                                                gauss_sigma=gauss_sigma,
+                                                ma_step=ma_step)
     
     # Compute max relative abundance
-    ht = df_sample.groupby(['m/z', 'temp_bin'])['abun_scaled'].agg('max').reset_index()
+    if smooth:
+        ht = df_sample.groupby(['m/z', 'temp_bin'])['abun_scaled_smooth'].agg('max').reset_index()
+    else:
+        ht = df_sample.groupby(['m/z', 'temp_bin'])['abun_scaled'].agg('max').reset_index()
+    
     ht = ht.replace(np.nan, 0)
     ht['sample_id'] = sample_name
     ht.columns = ['Ion_type', 'temp_bin', 'max_rel_abund', 'sample_id']
@@ -55,7 +70,12 @@ def bin_temp_abund(df_sample, sample_name:str, detrend_method:str):
     return ht_pivot
 
 
-def features_iontemp_abun(df_meta, sample_list, detrend_method:str):
+def features_iontemp_abun(df_meta, sample_list, detrend_method:str,
+                          remove_mz_cnt:bool=False, remove_mz_thrs=None,
+                          smooth:bool=False,
+                          smoothing_type:str='gauss',
+                          gauss_sigma:int=5,
+                          ma_step:int=None):
     
     # Initialize a table to store computed values
     dt = pd.DataFrame(dtype='float64')
@@ -69,7 +89,13 @@ def features_iontemp_abun(df_meta, sample_list, detrend_method:str):
         #print(sample_name)
         df_sample = preprocess.get_sample(df_meta, i)
         
-        ht_pivot = bin_temp_abund(df_sample, sample_name, detrend_method)
+        ht_pivot = bin_temp_abund(df_sample, sample_name, detrend_method,
+                                  remove_mz_cnt=remove_mz_cnt,
+                                  remove_mz_thrs=remove_mz_thrs,
+                                  smooth=smooth,
+                                    smoothing_type=smoothing_type,
+                                    gauss_sigma=gauss_sigma,
+                                    ma_step=ma_step)
         #ion_temp_dict[sample_name] = ht_pivot
         dt = pd.concat([dt, ht_pivot])
     

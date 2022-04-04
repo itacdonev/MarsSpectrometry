@@ -6,6 +6,7 @@ from src import config, preprocess
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
+from scipy.ndimage.filters import gaussian_filter1d
 
 
 
@@ -174,21 +175,24 @@ def smooth_mz_ts(df_sample,
     """
     
     if smoothing_type == 'gauss':
-        df_sample['abun_scaled_gauss_' + 
-                  str(gauss_sigma)] = df_sample.groupby('m/z')['abun_scaled']\
+        df_sample['abun_scaled_smooth'] = df_sample.groupby('m/z')['abun_scaled']\
                                                .transform(lambda x: gaussian_filter1d(x, 
                                                                   sigma=gauss_sigma))
     else:
-        df_sample['abun_scaled_ma_' + 
-                  str(ma_step)] = df_sample.groupby('m/z')['abun_scaled']\
+        df_sample['abun_scaled_smooth'] = df_sample.groupby('m/z')['abun_scaled']\
                                             .transform(lambda x: x.rolling(ma_step,1, center=True).mean())
     return df_sample
 
 
 def preprocess_samples(df, 
-                       detrend_method:str, poly_degree:int=2,
+                       detrend_method:str, 
+                       poly_degree:int=2,
                        remove_mz_cnt:bool=False,
-                       remove_mz_thrs=None):
+                       remove_mz_thrs=None,
+                       smooth:bool=False,
+                       smoothing_type:str='gauss',
+                       gauss_sigma:int=5,
+                       ma_step:int=None):
     # Preprocess m/z
     df = preprocess_mz_value(df)
     
@@ -207,6 +211,13 @@ def preprocess_samples(df,
     # MinMax scale abundance
     df = scale_abun(df)
     
+    # Smoothing
+    if smooth:
+        df = smooth_mz_ts(df, 
+                          smoothing_type=smoothing_type,
+                          gauss_sigma=gauss_sigma,
+                          ma_step=ma_step)
+        
     return df
 
 

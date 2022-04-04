@@ -60,6 +60,28 @@ def preprocess_ion_type(df):
     return df
 
 
+def remove_small_cnt_mz(df_sample, train_mean_cnt_mz):
+    
+    # Check how many in a sample are below the expected mean value of the train sample
+    sample_mz_n_cnt = df_sample.groupby('m/z')['abun_scaled'].agg('count')
+    
+    # which mz values are less than what is expected from the train sample
+    small_cnt_mz = []
+    for mz_idx in (sample_mz_n_cnt.index):
+        tr_mz = train_mean_cnt_mz[mz_idx]
+        s_mz = sample_mz_n_cnt[mz_idx]
+        if s_mz < tr_mz:
+            small_cnt_mz.append(mz_idx)
+
+    # Remove insufficient m/z values
+    for mz in small_cnt_mz:
+        df_sample = df_sample[df_sample['m/z'] != mz]
+        assert df_sample[df_sample['m/z'] == mz].empty
+    
+    return df_sample
+
+         
+    
 def remove_bcg_abund(df):
     """
     Subtracts minimum abundance value

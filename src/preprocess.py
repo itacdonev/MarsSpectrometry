@@ -43,7 +43,7 @@ def get_sample(df_meta, i, verbose:bool=False):
     return df
 
 
-def preprocess_ion_type(df):
+def preprocess_mz_value(df):
     """
     Preprocess sample observations.
     """
@@ -73,6 +73,8 @@ def remove_small_cnt_mz(df_sample, train_mean_cnt_mz):
         if s_mz < tr_mz:
             small_cnt_mz.append(mz_idx)
 
+    print(f'mz values to remove: {small_cnt_mz}')
+    
     # Remove insufficient m/z values
     for mz in small_cnt_mz:
         df_sample = df_sample[df_sample['m/z'] != mz]
@@ -162,7 +164,7 @@ def scale_abun(df):
 
 def preprocess_samples(df, detrend_method:str, poly_degree:int=2):
     # Preprocess m/z
-    df = preprocess_ion_type(df)
+    df = preprocess_mz_value(df)
     
     if detrend_method == 'min':
         # Remove background abundance

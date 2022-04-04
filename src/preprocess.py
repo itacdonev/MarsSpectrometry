@@ -60,26 +60,26 @@ def preprocess_mz_value(df):
     return df
 
 
-def remove_small_cnt_mz(df_sample, train_mean_cnt_mz):
+def remove_small_cnt_mz(df_sample, remove_mz_thrs):
     
     # Check how many in a sample are below the expected mean value of the train sample
-    sample_mz_n_cnt = df_sample.groupby('m/z')['abun_scaled'].agg('count')
+    sample_mz_n_cnt = df_sample.groupby('m/z')['abundance'].agg('count')
     
     # which mz values are less than what is expected from the train sample
     small_cnt_mz = []
     for mz_idx in (sample_mz_n_cnt.index):
-        tr_mz = train_mean_cnt_mz[mz_idx]
         s_mz = sample_mz_n_cnt[mz_idx]
-        if s_mz < tr_mz:
+        if s_mz < remove_mz_thrs:
             small_cnt_mz.append(mz_idx)
 
-    print(f'mz values to remove: {small_cnt_mz}')
-    
     # Remove insufficient m/z values
-    for mz in small_cnt_mz:
-        df_sample = df_sample[df_sample['m/z'] != mz]
-        assert df_sample[df_sample['m/z'] == mz].empty
-    
+    if len(small_cnt_mz) > 0:
+        #print(f'mz values to remove: {small_cnt_mz}')
+        for mz in small_cnt_mz:
+            #print(f'Removing {mz}')
+            df_sample = df_sample[df_sample['m/z'] != mz]
+            assert df_sample[df_sample['m/z'] == mz].empty
+        
     return df_sample
 
          
@@ -162,14 +162,39 @@ def scale_abun(df):
     return df
 
 
+def smooth_mz_ts(df_sample, 
+                 smoothing_type:str='gauss',
+                 gauss_sigma:int=5,
+                 ma_step:int=None):
+    """
+    Use Gaussian filter 1D to smooth the mz values.
+    The sample should be preprocesses.
+    
+    smoothing_type (str, default='gauss', other possible values: 'ma')
+    """
+    
+    if smoothing_type == 'gauss':
+        df_sample['abun_scaled_gauss_' + 
+                  str(gauss_sigma)] = df_sample.groupby('m/z')['abun_scaled']\
+                                               .transform(lambda x: gaussian_filter1d(x, 
+                                                                  sigma=gauss_sigma))
+    else:
+        df_sample['abun_scaled_ma_' + 
+                  str(ma_step)] = df_sample.groupby('m/z')['abun_scaled']\
+                                            .transform(lambda x: x.rolling(ma_step,1, center=True).mean())
+    return df_sample
+
+
 def preprocess_samples(df, 
                        detrend_method:str, poly_degree:int=2,
-                       remove_mz_cnt:bool=False):
+                       remove_mz_cnt:bool=False,
+                       remove_mz_thrs=None):
     # Preprocess m/z
     df = preprocess_mz_value(df)
     
     if remove_mz_cnt:
-        remove_small_cnt_mz(df)
+        #print(f'Removing mz ...')
+        remove_small_cnt_mz(df, remove_mz_thrs=remove_mz_thrs)
     
     if detrend_method == 'min':
         # Remove background abundance

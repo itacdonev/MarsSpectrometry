@@ -42,17 +42,18 @@ def plot_mz_ts(df_sample,col_to_plot:str):
     ions = df_sample['m/z'].unique().tolist()
 
     for ion in ions:
-        if df_sample[df_sample['m/z'] == ion]['abun_scaled'].max() > 0.01:
+        if df_sample[df_sample['m/z'] == ion]['abun_scaled'].max() > 0.02:
             plt.plot(df_sample[df_sample['m/z'] == ion]['temp'],
                     df_sample[df_sample['m/z'] == ion][col_to_plot], 
-                    label=ion)
+                    label=ion)            
         else:
             plt.plot(df_sample[df_sample['m/z'] == ion]['temp'],
-                    df_sample[df_sample['m/z'] == ion][col_to_plot])
+                    df_sample[df_sample['m/z'] == ion][col_to_plot])            
     plt.legend()
     plt.xlabel('Temperature')
     plt.ylabel(col_to_plot)
     plt.title('Time series plot for each m/z ion')
+    
     sns.despine()
     plt.show()
     
@@ -68,10 +69,32 @@ def plot_ms(df_sample, col_to_plot:str, target:str=None, sample_id:str=None):
         y = temp[col_to_plot].max()
         if y > 0.01:
             plt.plot([ion,ion], [0,y], label=ion)
+            #plt.ylim(0,0.1)
         else:
             plt.plot([ion,ion], [0,y], c='#2D4B73')
-    
+            #plt.ylim(0,0.1)
+     
     plt.legend()
     plt.title(f'Sample: {sample_id}   Target: {target}')
     plt.xlabel('m/z ion')
     sns.despine()
+    
+def plot_mz_ts(df_sample,col_to_plot:str):
+    
+    ions = df_sample['m/z'].unique().tolist()
+
+    for ion in ions:
+        if df_sample[df_sample['m/z'] == ion]['abun_scaled'].max() > 0.02:
+            plt.plot(df_sample[df_sample['m/z'] == ion]['temp'],
+                    df_sample[df_sample['m/z'] == ion][col_to_plot], 
+                    label=ion)            
+        else:
+            plt.plot(df_sample[df_sample['m/z'] == ion]['temp'],
+                    df_sample[df_sample['m/z'] == ion][col_to_plot])            
+    plt.legend()
+    plt.xlabel('Temperature')
+    plt.ylabel(col_to_plot)
+    plt.title('Time series plot for each m/z ion')
+    
+    sns.despine()
+    plt.show()

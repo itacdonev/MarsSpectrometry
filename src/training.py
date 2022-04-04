@@ -1,10 +1,10 @@
 from logging import raiseExceptions
-from multiprocessing import Pipe
 from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
 from sklearn.preprocessing import LabelEncoder
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
 from sklearn.decomposition import PCA
+from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from termcolor import colored
 from src import config, features, model_selection
@@ -118,7 +118,7 @@ def trainCV_label(X, df_y,
     
     # TRAIN EACH LABEL SEPARATELY
     for label in label_names: 
-        #print(colored(label, 'blue'))
+        print(colored(label, 'magenta'))
         if verbose:
             print(colored(f'\nLABEL: {label}', 'blue'))
         
@@ -285,7 +285,8 @@ def train_full_model(X, df_y,
                                              use_label_encoder = False,
                                              eval_metric = 'logloss',
                                              learning_rate = 0.09))])
-            
+        elif model_algo == 'RFC':
+            clf = RandomForestClassifier(random_state=config.RANDOM_SEED) 
          
         # ===== FIT THE MODEL FOR LABEL =====
         #print('Fit the model')
@@ -326,7 +327,7 @@ def train_tbl(df_train, df_labels,
                                             df_test + '.csv'))
         
     # CV TRAINING
-    #print('CV training ....')
+    print(colored('CV training ....', 'blue'))
     train_cv_loss = trainCV_label(X=df_train,
                                   df_y=df_labels,
                                   target=target_list, 
@@ -338,7 +339,7 @@ def train_tbl(df_train, df_labels,
                                   target_encode_fts=target_encode_fts)
     
     # FULL TRAINING
-    #print('Full training .....')
+    print(colored('Full training .....', 'blue'))
     submission = train_full_model(X=df_train,
                                   df_y=df_labels,
                                   Xte=df_test,    

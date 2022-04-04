@@ -208,18 +208,23 @@ def train_full_model(X, df_y,
                      Xte, 
                      model_algo:str,
                      target_encode:bool=None,
-                     target_encode_fts:list=None
+                     target_encode_fts:list=None,
+                     test_sam:bool=False,
+                     df_valid_sam=None
                      ):
     """
     Train full model
     
     model_algo: 'LR', 'XGB'
     """
-    # Read in the submission file
-    submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
-                            index_col='sample_id')
-    assert submission.shape[0] == Xte.shape[0]
-    
+    if not test_sam:
+        # Read in the submission file
+        submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
+                                index_col='sample_id')
+        assert submission.shape[0] == Xte.shape[0]
+    else:
+        submission = df_valid_sam.copy()
+        
     # Get label names
     label_names = df_y[target]
     #clf_fitted_dict = {}              # fitted classifiers
@@ -309,7 +314,9 @@ def train_tbl(df_train, df_labels,
               sub_name:str, 
               target_encode:bool=None, 
               target_encode_fts:list=None,
-              verbose:bool=False):
+              verbose:bool=False,
+              test_sam:bool=False,
+              df_valid_sam=None):
     """
     Train tabular data. The training is done on CV and full dataset.
     
@@ -347,7 +354,9 @@ def train_tbl(df_train, df_labels,
                                   target=target_list,
                                   model_algo=model_algo,
                                   target_encode=target_encode,
-                                  target_encode_fts=target_encode_fts)
+                                  target_encode_fts=target_encode_fts,
+                                  test_sam=test_sam,
+                                  df_valid_sam=df_valid_sam)
     
     # Save submission file
     submission.to_csv(config.MODELS_DIR + sub_name + '.csv')

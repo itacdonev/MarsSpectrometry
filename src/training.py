@@ -209,22 +209,23 @@ def train_full_model(X, df_y,
                      model_algo:str,
                      target_encode:bool=None,
                      target_encode_fts:list=None,
-                     test_sam:bool=False,
-                     df_valid_sam=None
+                     test_sam:bool=False
                      ):
     """
     Train full model
     
     model_algo: 'LR', 'XGB'
     """
-    if not test_sam:
-        # Read in the submission file
-        submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
-                                index_col='sample_id')
-        assert submission.shape[0] == Xte.shape[0]
-    else:
-        submission = df_valid_sam.copy()
-        
+    
+    # Read in the submission file
+    submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
+                            index_col='sample_id')
+    
+    if test_sam:
+        submission = submission.tail(12).copy()
+    
+    assert submission.shape[0] == Xte.shape[0]    
+    
     # Get label names
     label_names = df_y[target]
     #clf_fitted_dict = {}              # fitted classifiers
@@ -368,21 +369,22 @@ def train_tbl(df_train, df_labels,
     return train_cv_loss, submission
 
 
-def compute_valid_loss(submission_file_VT, valid_files, 
+def compute_valid_loss(submission_file_VT, 
+                       valid_files, 
                        valid_labels, target_label_list):
     """
     Compute validation loss.
     Model is trained only on TRAIN data set.
     Predictions are computed on the VALID data set.
     """
-    df_sub = submission_file_VT.iloc[:len(submission_file_VT),:]
+    df_sub = submission_file_VT.iloc[:len(valid_files),:]
     print(df_sub.shape)
     
     model_ll = {}
     for label in target_label_list:
         y_actual = valid_labels[label].iloc[:len(valid_files)]
         y_preds = df_sub[label].iloc[:len(valid_files)]
-        model_ll[label] = log_loss(y_actual, y_preds)
+        model_ll[label] = log_loss(y_actual, y_preds, labels=(0,1))
         
     print(f'Average Log Loss of full model: {np.mean(list(model_ll.values()))}')
     

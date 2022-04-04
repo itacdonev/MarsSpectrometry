@@ -162,9 +162,14 @@ def scale_abun(df):
     return df
 
 
-def preprocess_samples(df, detrend_method:str, poly_degree:int=2):
+def preprocess_samples(df, 
+                       detrend_method:str, poly_degree:int=2,
+                       remove_mz_cnt:bool=False):
     # Preprocess m/z
     df = preprocess_mz_value(df)
+    
+    if remove_mz_cnt:
+        remove_small_cnt_mz(df)
     
     if detrend_method == 'min':
         # Remove background abundance

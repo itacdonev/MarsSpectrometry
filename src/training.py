@@ -354,6 +354,12 @@ def train_tbl(df_train, df_labels,
                                   verbose=verbose,
                                   target_encode_fts=target_encode_fts)
     
+    train_cv_loss_df = pd.DataFrame.from_dict(train_cv_loss, orient='index')
+    train_cv_loss_df.columns = [sub_name]
+    train_cv_loss_df.index = train_cv_loss_df.index.set_names('target')
+    train_cv_loss_df.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_cvloss.csv'),
+                            index=True)
+    
     # FULL TRAINING
     print(colored('Full training .....', 'blue'))
     submission = train_full_model(X=df_train,
@@ -375,9 +381,11 @@ def train_tbl(df_train, df_labels,
     return train_cv_loss, submission
 
 
-def compute_valid_loss(submission_file_VT, 
-                       valid_files, 
-                       valid_labels, target_label_list):
+def compute_valid_loss(submission_file_VT,
+                       valid_files,
+                       valid_labels, 
+                       target_label_list,
+                       sub_name:str):
     """
     Compute validation loss.
     Model is trained only on TRAIN data set.
@@ -392,6 +400,11 @@ def compute_valid_loss(submission_file_VT,
         y_preds = df_sub[label].iloc[:len(valid_files)]
         model_ll[label] = log_loss(y_actual, y_preds, labels=(0,1))
         
-    print(f'Average Log Loss of full model: {np.mean(list(model_ll.values()))}')
-    
+    #print(f'Average Log Loss of full model: {np.mean(list(model_ll.values()))}')
+    valid_loss = pd.DataFrame.from_dict(model_ll, orient='index')
+    valid_loss.columns = [sub_name + 'V']
+    valid_loss.index = valid_loss.index.set_names('target')
+    valid_loss.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_Vloss.csv'),
+                            index=True)
+
     return model_ll, np.mean(list(model_ll.values()))

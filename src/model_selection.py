@@ -26,6 +26,9 @@ models = {
     
     'LGBM': lgb.LGBMClassifier(),
     
+    'LGBM_opt': lgb.LGBMClassifier(learning_rate=0.09,
+                                   random_state=config.RANDOM_SEED),
+    
     'XGB': xgb.XGBClassifier(objective = "binary:logistic",
                              use_label_encoder = False,
                              eval_metric = 'logloss'),

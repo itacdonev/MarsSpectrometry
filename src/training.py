@@ -277,6 +277,10 @@ def train_full_model(X, df_y,
             
         elif model_algo == 'LGBM':
             clf = lgb.LGBMClassifier()
+            
+        elif model_algo == 'LGBM_opt':
+            clf = lgb.LGBMClassifier(learning_rate=0.09,
+                                     random_state=config.RANDOM_SEED)
 
         elif model_algo == 'XGB':
             clf = xgb.XGBClassifier(objective = "binary:logistic",
@@ -320,8 +324,7 @@ def train_tbl(df_train, df_labels,
               target_encode:bool=None, 
               target_encode_fts:list=None,
               verbose:bool=False,
-              test_sam:bool=False,
-              df_valid_sam=None):
+              test_sam:bool=False):
     """
     Train tabular data. The training is done on CV and full dataset.
     
@@ -360,8 +363,7 @@ def train_tbl(df_train, df_labels,
                                   model_algo=model_algo,
                                   target_encode=target_encode,
                                   target_encode_fts=target_encode_fts,
-                                  test_sam=test_sam,
-                                  df_valid_sam=df_valid_sam)
+                                  test_sam=test_sam)
     
     # Save submission file
     submission.to_csv(config.MODELS_DIR + sub_name + '.csv')

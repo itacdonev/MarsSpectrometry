@@ -8,6 +8,7 @@ from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
 from sklearn import svm
 import xgboost as xgb
+import lightgbm as lgb
 from src import config
 
 
@@ -22,6 +23,8 @@ models = {
                                  class_weight=config.CLASS_WEIGHTS),
     
     'RFC': RandomForestClassifier(random_state=config.RANDOM_SEED),
+    
+    'LGBM': lgb.LGBMClassifier(),
     
     'XGB': xgb.XGBClassifier(objective = "binary:logistic",
                              use_label_encoder = False,

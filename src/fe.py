@@ -49,7 +49,9 @@ class CreateFeatures:
 
 
     # Combine more than one feature data set
-    def combine_features(self, features_list:list):
+    def combine_features(self,
+                         features_list:list,
+                         feature_name:str):
         """
         Combine more than one computed data frame
         into a one training sample.
@@ -63,13 +65,19 @@ class CreateFeatures:
             df_fts = pd.DataFrame()
 
             for fts in features_list:
-                file_path = os.path.join(config.DATA_DIR_OUT, fts)
+                file_path = os.path.join(config.DATA_DIR_OUT, 
+                                         fts + '_' + self.file_suffix + '.csv')
                 if os.path.exists(file_path):
                     temp_df = pd.read_csv(file_path)
                     df_fts = pd.concat([df_fts, temp_df], axis=1)
                     assert temp_df.shape[0] == df_fts.shape[0]
 
         df_fts = df_fts.replace(np.nan, 0)
+
+        # Save feature data frame
+        df_fts.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                   feature_name + '_' + self.file_suffix + '.csv'),
+                        index=False)
 
         return df_fts
 
@@ -125,7 +133,8 @@ class CreateFeatures:
         for i in self.files_dict:
             sample_name = self.metadata.iloc[i]['sample_id']
             df_sample = preprocess.get_sample(self.metadata, i)
-            
+            #TODO all these don't have to be declaed for the class
+            # but only within this function - FIX IT
             ht_pivot = features.bin_temp_abund(df_sample,
                                                sample_name,
                                                self.detrend_method,
@@ -162,3 +171,23 @@ class CreateFeatures:
                         index=False)
             
         return dt
+    
+    
+    # def fts_cntpk_mratt(self):
+    #     """
+    #     Combines all computed ion peaks stats from each sample
+    #     into a features data frame.
+    #     """
+    #     # Initialize a data frame to store all the sample calculations
+    #     df = pd.DataFrame()
+        
+    #     for sample_idx in tqdm(self.files_dict):
+    #         ion_peaks_df = features.compute_ion_peaks(metadata=self.metadata,
+    #                                                   sample_idx=sample_idx,
+    #                                                   detrend_method=self.detrend_method)
+    #         df = pd.concat([df,ion_peaks_df], axis = 0)
+        
+    #     # Join multi column index into one separated by -
+    #     df.columns = df.columns.map(lambda x: '_'.join([str(i) for i in x]))
+        
+    #     return df

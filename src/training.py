@@ -8,6 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from termcolor import colored
 from src import config, features, model_selection
+import lightgbm as lgb
 import xgboost as xgb
 from xgboost import plot_importance
 import numpy as np
@@ -273,6 +274,9 @@ def train_full_model(X, df_y,
         if model_algo == 'LR_reg':
             clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
                                     random_state=config.RANDOM_SEED)
+            
+        elif model_algo == 'LGBM':
+            clf = lgb.LGBMClassifier()
 
         elif model_algo == 'XGB':
             clf = xgb.XGBClassifier(objective = "binary:logistic",

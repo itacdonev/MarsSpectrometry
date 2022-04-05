@@ -44,7 +44,7 @@ def get_sample(df_meta, i, verbose:bool=False):
     return df
 
 
-def preprocess_mz_value(df):
+def preprocess_mz_value(df, remove_He:bool=True):
     """
     Preprocess sample observations.
     """
@@ -56,7 +56,8 @@ def preprocess_mz_value(df):
     df = df[df['m/z'] < config.MZ_THRESHOLD]
     
     # Remove all observations of the Helium carrier gas
-    df = df[df['m/z'] != 4]
+    if remove_He:
+        df = df[df['m/z'] != 4]
     
     return df
 
@@ -192,9 +193,10 @@ def preprocess_samples(df,
                        smooth:bool=False,
                        smoothing_type:str='gauss',
                        gauss_sigma:int=5,
-                       ma_step:int=None):
+                       ma_step:int=None,
+                       remove_He:bool=True):
     # Preprocess m/z
-    df = preprocess_mz_value(df)
+    df = preprocess_mz_value(df, remove_He=remove_He)
     
     if remove_mz_cnt:
         #print(f'Removing mz ...')

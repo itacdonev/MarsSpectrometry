@@ -18,7 +18,7 @@ class CreateFeatures:
 
     def __init__(self,
                  metadata,
-                 files_dict:dict,
+                 files_dict:dict=None,
                  file_suffix:str=None,
                  detrend_method:str='min',
                  remove_mz_cnt:bool=False,
@@ -46,6 +46,33 @@ class CreateFeatures:
 
     def __repr__(self):
         return "Creating features ... "
+
+
+    # Combine more than one feature data set
+    def combine_features(self, features_list:list):
+        """
+        Combine more than one computed data frame
+        into a one training sample.
+
+        features_list (list): Should contain full names
+                              of files to combine saved in
+                              DATA_DIR_OUT.
+        """
+        if len(features_list) > 0:
+
+            df_fts = pd.DataFrame()
+
+            for fts in features_list:
+                file_path = os.path.join(config.DATA_DIR_OUT, fts)
+                if os.path.exists(file_path):
+                    temp_df = pd.read_csv(file_path)
+                    df_fts = pd.concat([df_fts, temp_df], axis=1)
+                    assert temp_df.shape[0] == df_fts.shape[0]
+
+        df_fts = df_fts.replace(np.nan, 0)
+
+        return df_fts
+
 
     # Correlation mz4 with other mz values
     def fts_corr_mz4(self):

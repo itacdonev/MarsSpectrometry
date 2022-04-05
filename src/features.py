@@ -826,6 +826,41 @@ def slope_time_temp(train_files:dict, metadata, detrend_method):
     return coefs_lr
 
 
+def lr_corr_mz4(df_sample, 
+                corr_method:str='spearman'):
+    """
+    Linear regression of the 
+    correlation coefficient between 
+    m/z=4 and all other m/z values.
+    """
+    # Create a pivot table so that each m/z value is a column
+    df_sample = df_sample.pivot(index='time', 
+                                columns='m/z', 
+                                values='abun_scaled')
+
+    # Compute correlation
+    df_corr = df_sample.corr(method=corr_method)
+    
+    # Remove m/z 4 from index and select only mz4 from the columns
+    # to get mz4 correlation with all other mz values
+    df_corr = df_corr[df_corr.index != 4.0][[4.0]]
+    # Reset index to get mz as a column
+    df_corr = df_corr.reset_index()
+    df_corr.columns = ['m/z', 'mz_4']
+    
+    # Remove all mz values with corr less than the threshold
+    tmp = df_corr[np.abs(df_corr['mz_4']) > config.CORRELATION_THRESHOLD]
+    
+    # Compute linear regression
+    lr = LinearRegression()
+    X = np.array(tmp['m/z']).reshape(-1,1)
+    y = tmp['mz_4'].values
+    lr.fit(X,y)
+    
+    return lr.coef_[0]
+    
+
+
 
 # ===== TEMPERATURE QUANTILE =====
    

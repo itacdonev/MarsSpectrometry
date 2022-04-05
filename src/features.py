@@ -1,23 +1,14 @@
 """Feature engineering"""
 
-from __future__ import annotations
-
-from calendar import c
-from importlib.metadata import metadata
-from operator import index
+import gc
 import pandas as pd
 import numpy as np
-from src import config, preprocess, utils
 from scipy.signal import find_peaks
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import spearmanr
-
-from sklearn.metrics import auc
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
-import gc
-from termcolor import colored
-
+from src import config, preprocess, utils
 
 
 # BENCHMARK FEATURES
@@ -70,13 +61,18 @@ def bin_temp_abund(df_sample, sample_name:str, detrend_method:str,
     return ht_pivot
 
 
-def features_iontemp_abun(df_meta, sample_list, detrend_method:str,
-                          remove_mz_cnt:bool=False, remove_mz_thrs=None,
+def features_iontemp_abun(df_meta, 
+                          sample_list, 
+                          detrend_method:str,
+                          remove_mz_cnt:bool=False, 
+                          remove_mz_thrs=None,
                           smooth:bool=False,
                           smoothing_type:str='gauss',
                           gauss_sigma:int=5,
                           ma_step:int=None):
-    
+    """
+    Finish
+    """
     # Initialize a table to store computed values
     dt = pd.DataFrame(dtype='float64')
     
@@ -833,33 +829,39 @@ def lr_corr_mz4(df_sample,
     correlation coefficient between 
     m/z=4 and all other m/z values.
     """
-    # Create a pivot table so that each m/z value is a column
-    df_sample = df_sample.pivot(index='time', 
-                                columns='m/z', 
-                                values='abun_scaled')
+    mz_list = df_sample['m/z'].unique().tolist()
 
-    # Compute correlation
-    df_corr = df_sample.corr(method=corr_method)
-    
-    # Remove m/z 4 from index and select only mz4 from the columns
-    # to get mz4 correlation with all other mz values
-    df_corr = df_corr[df_corr.index != 4.0][[4.0]]
-    # Reset index to get mz as a column
-    df_corr = df_corr.reset_index()
-    df_corr.columns = ['m/z', 'mz_4']
-    
-    # Remove all mz values with corr less than the threshold
-    tmp = df_corr[np.abs(df_corr['mz_4']) > config.CORRELATION_THRESHOLD]
-    
+    if 4.0 in mz_list:
+        # Create a pivot table so that each m/z value is a column
+        df_sample = df_sample.pivot(index='time',
+                                    columns='m/z',
+                                    values='abun_scaled')
+
+        # Compute correlation
+        df_corr = df_sample.corr(method=corr_method)
+        # Remove m/z 4 from index and select only mz4 from the columns
+        # to get mz4 correlation with all other mz values
+        df_corr = df_corr[df_corr.index != 4.0][[4.0]]
+        # Reset index to get mz as a column
+        df_corr = df_corr.reset_index()
+        df_corr.columns = ['m/z', 'mz_4']
+
+        # Remove all mz values with corr less than the threshold
+        tmp = df_corr[np.abs(df_corr['mz_4']) > config.CORRELATION_THRESHOLD]
+    else:
+        tmp = pd.DataFrame()
+
     # Compute linear regression
-    lr = LinearRegression()
-    X = np.array(tmp['m/z']).reshape(-1,1)
-    y = tmp['mz_4'].values
-    lr.fit(X,y)
-    
-    return lr.coef_[0]
-    
+    if not tmp.empty:
+        lr = LinearRegression()
+        X = np.array(tmp['m/z']).reshape(-1,1)
+        y = tmp['mz_4'].values
+        lr.fit(X,y)
+        lr_coef = lr.coef_[0]
+    else:
+        lr_coef = np.nan
 
+    return lr_coef
 
 
 # ===== TEMPERATURE QUANTILE =====

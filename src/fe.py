@@ -7,7 +7,6 @@ import os
 from tqdm import tqdm
 import pandas as pd
 import numpy as np
-from termcolor import colored
 from src import config, features, preprocess
 
 
@@ -173,21 +172,33 @@ class CreateFeatures:
         return dt
     
     
-    # def fts_cntpk_mratt(self):
-    #     """
-    #     Combines all computed ion peaks stats from each sample
-    #     into a features data frame.
-    #     """
-    #     # Initialize a data frame to store all the sample calculations
-    #     df = pd.DataFrame()
-        
-    #     for sample_idx in tqdm(self.files_dict):
-    #         ion_peaks_df = features.compute_ion_peaks(metadata=self.metadata,
-    #                                                   sample_idx=sample_idx,
-    #                                                   detrend_method=self.detrend_method)
-    #         df = pd.concat([df,ion_peaks_df], axis = 0)
-        
-    #     # Join multi column index into one separated by -
-    #     df.columns = df.columns.map(lambda x: '_'.join([str(i) for i in x]))
-        
-    #     return df
+    def fts_cntpk_mratt(self):
+        """
+        Combines all computed ion peaks stats from each sample
+        into a features data frame.
+        """
+        # Initialize a data frame to store all the sample calculations
+        df = pd.DataFrame()
+
+        for sample_idx in tqdm(self.files_dict):
+            ion_peaks_df = features.compute_ion_peaks(metadata=self.metadata,
+                                                      sample_idx=sample_idx,
+                                                      detrend_method=self.detrend_method,
+                                                      gauss_sigma=self.gauss_sigma)
+            df = pd.concat([df,ion_peaks_df], axis = 0)
+
+        # Join multi column index into one separated by -
+        df.columns = df.columns.map(lambda x: '_'.join([str(i) for i in x]))
+
+        # Save features file to csv
+        if self.file_suffix:
+            df.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                        'fts_cntpk_mratt_' + self.file_suffix + '.csv'),
+                        index=False)
+        else:
+            df.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                        'fts_cntpk_mratt_.csv'),
+                        index=False)
+
+        return df
+    

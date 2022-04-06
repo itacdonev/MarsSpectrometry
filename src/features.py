@@ -540,34 +540,35 @@ def get_reference_peak(df_sample):
     
     
     
-def compute_ion_peaks(metadata, sample_idx, ion_list, detrend_method):
+def compute_ion_peaks(metadata, sample_idx, detrend_method, gauss_sigma:int=5):
     
     # Select a sample and get sample name
     df_sample = preprocess.get_sample(metadata, sample_idx)
     sample_name = metadata.iloc[sample_idx]['sample_id']
+    mz_list = df_sample['m/z'].unique().tolist()
     
     # Preprocess the sample
-    df_sample = preprocess.preprocess_samples(df_sample, 
+    df_sample = preprocess.preprocess_samples(df_sample,
                                               detrend_method=detrend_method)
     
     # Compute stats and save in dict for each ion type
     ion_peaks_cnt = {} # Initialize dictionary to save calculated values
-    for ion in ion_list:
+    for ion in mz_list:
         #print(colored(f'ION: {ion}','blue'))
         ion_peaks_info = [] # initialize list to store stats per ion type
         
         temp_dt = df_sample[df_sample['m/z'] == ion].copy()
         
         # Apply Gaussian filter for the values
-        temp_dt['abun_minsub_scaled_filtered'] = gaussian_filter1d(temp_dt['abun_scaled'], 
-                                                                sigma=4)
+        temp_dt['abun_minsub_scaled_filtered'] = gaussian_filter1d(temp_dt['abun_scaled'],
+                                                                sigma=gauss_sigma)
         
-        # Compute the median for the prominence ("the minimum height necessary 
+        # Compute the median for the prominence ("the minimum height necessary
         # to descend to get from the summit to any higher terrain")
         med = temp_dt['abun_minsub_scaled_filtered'].median()
         
         # Find peaks
-        peaks, _ = find_peaks(temp_dt['abun_minsub_scaled_filtered'], 
+        peaks, _ = find_peaks(temp_dt['abun_minsub_scaled_filtered'],
                               prominence=med)
         ion_peaks_info.append(len(peaks))
         #if len(peaks) > 0: print(f'\nIon: {ion}, Peaks: {peaks}')
@@ -625,7 +626,7 @@ def compute_ion_peaks(metadata, sample_idx, ion_list, detrend_method):
 
 # Concat all samples together
 # Loop over all files compute peaks and concat together
-def features_ion_peaks(file_paths:dict, metadata, ion_list:list, detrend_method):
+def features_ion_peaks(file_paths:dict, metadata, detrend_method):
     """
     Combines all computed ion peaks stats from each sample
     into a features data frame.
@@ -634,7 +635,7 @@ def features_ion_peaks(file_paths:dict, metadata, ion_list:list, detrend_method)
     df = pd.DataFrame()
     
     for sample_idx in tqdm(file_paths):
-        ion_peaks_df = compute_ion_peaks(metadata, sample_idx, ion_list, detrend_method)
+        ion_peaks_df = compute_ion_peaks(metadata, sample_idx, detrend_method)
         df = pd.concat([df,ion_peaks_df], axis = 0)
     
     # Join multi column index into one separated by -

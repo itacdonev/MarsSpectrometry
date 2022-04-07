@@ -265,8 +265,8 @@ def features_ion_duration_maxtemp(df_meta, file_paths, ion_list):
 
 def get_all_peaks(df_sample):
     """
-    Taking all m/z ions and their intensities select all
-    m/z ions greater than some threshold.
+    Taking all m/z values and their intensities select all
+    m/z values greater than some threshold.
     Sample should be processed.
     """
     # get max for each m/z ion
@@ -300,19 +300,6 @@ def get_molecular_ion(df_sample):
     return M, M_mra
 
 
-def nitrogen_rule(df_sample):
-    #TODO Finish up - not clear - turn out that most of our 
-    # samples have N
-    M, _ = get_molecular_ion(df_sample)
-    
-    if M % 2 == 0:
-        M_nitro = 1 # even
-    else:
-        M_nitro = 0 # odd
-        
-    return M_nitro
-
-
 def get_Mp1_peak(df_sample):
     """
     Check whether there is an [M+1] peak and record the m/z value and the 
@@ -333,7 +320,7 @@ def get_Mp1_peak(df_sample):
 
 def get_Mp2_peak(df_sample):
     """
-    Check whether there is an [M+2] peak and record the m/z value and the 
+    Check whether there is an [M+2] peak and record the m/z value and the
     mra.
     Sample should be processed.
     """
@@ -351,8 +338,8 @@ def get_no_carbons(df_sample):
     Sample should be processed.
     """
     _, M_mra = get_molecular_ion(df_sample)
-    Mp1_mra, Mp1_isotope = get_Mp1_peak(df_sample)
-    
+    Mp1_mra, _ = get_Mp1_peak(df_sample)
+
     return np.round((Mp1_mra/M_mra) * (100/1.1),2)
     
    
@@ -540,17 +527,20 @@ def get_reference_peak(df_sample):
     
     
     
-def compute_ion_peaks(metadata, sample_idx, detrend_method, gauss_sigma:int=5):
+def compute_ion_peaks(metadata, 
+                      sample_idx, 
+                      detrend_method, 
+                      gauss_sigma:int=5):
     
     # Select a sample and get sample name
     df_sample = preprocess.get_sample(metadata, sample_idx)
     sample_name = metadata.iloc[sample_idx]['sample_id']
-    mz_list = df_sample['m/z'].unique().tolist()
-    
+
     # Preprocess the sample
     df_sample = preprocess.preprocess_samples(df_sample,
-                                              detrend_method=detrend_method)
-    
+                                              detrend_method=detrend_method,
+                                              )
+    mz_list = df_sample['m/z'].unique().tolist()    
     # Compute stats and save in dict for each ion type
     ion_peaks_cnt = {} # Initialize dictionary to save calculated values
     for ion in mz_list:
@@ -804,22 +794,22 @@ def slope_time_temp(train_files:dict, metadata, detrend_method):
     linear regression. Is there any difference between
     commercial and sam_testbed samples?
     """
-    
+
     coefs_lr = {}
-    
+
     for i in tqdm(train_files):
         ht = preprocess.get_sample(metadata, i)
         ht = preprocess.preprocess_samples(ht, detrend_method=detrend_method)
         sample_name = metadata.iloc[i]['sample_id']
-        
+
         lr = LinearRegression()
-        
+
         X = np.array(ht['time']).reshape(-1, 1)
         y = ht['temp'].values
         lr.fit(X, y)
-    
+
         coefs_lr[sample_name] = lr.coef_[0]
-        
+
     return coefs_lr
 
 
@@ -978,7 +968,7 @@ def get_topN_ions(metadata, N:int=3, normalize:bool=True,
     Compute top N ions by their max relative
     abundance. 
     
-    Parameters
+    Parameters  
     ----------
         metadata: pandas data frame
         

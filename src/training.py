@@ -14,6 +14,7 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn import svm
+import joblib
 import lightgbm as lgb
 import xgboost as xgb
 from xgboost import plot_importance
@@ -221,10 +222,11 @@ def trainCV_label(X, df_y,
 def train_full_model(X, df_y, 
                      target:list, 
                      Xte, 
+                     sub_name,
                      model_algo:str,
                      target_encode:bool=None,
                      target_encode_fts:list=None,
-                     test_sam:bool=False
+                     test_sam:bool=False,
                      ):
     """
     Train full model
@@ -335,9 +337,13 @@ def train_full_model(X, df_y,
             _,ax = plt.subplots(1,1,figsize=(10,10))
             plot_importance(clf, max_num_features=25, ax=ax)
             plt.show()
-            
-            plot_tree(clf, num_trees=6)
-            
+            #TODO install graphviz to plot tree
+            #plot_tree(clf, num_trees=6)
+
+        # save model to file
+        joblib.dump(clf, os.path.join(config.MODELS_DIR,
+                                      sub_name + '_' + label + ".joblib.dat"))
+
         # Make predictions
         submission[label] = clf.predict_proba(Xtest)[:,1]
 
@@ -392,7 +398,8 @@ def train_tbl(df_train, df_labels,
     print(colored('Full training .....', 'blue'))
     submission = train_full_model(X=df_train,
                                   df_y=df_labels,
-                                  Xte=df_test,    
+                                  Xte=df_test,
+                                  sub_name=sub_name,
                                   target=target_list,
                                   model_algo=model_algo,
                                   target_encode=target_encode,

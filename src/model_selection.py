@@ -33,6 +33,11 @@ models = {
                              use_label_encoder = False,
                              eval_metric = 'logloss'),
     
+    'XGB_imb': xgb.XGBClassifier(objective = "binary:logistic",
+                                 use_label_encoder = False,
+                                 eval_metric = 'logloss',
+                                 learning_rate = 0.09),
+    
     'XGB_opt': Pipeline([('XGB_opt', xgb.XGBClassifier(objective = "binary:logistic",
                                  use_label_encoder = False,
                                  eval_metric = 'logloss',

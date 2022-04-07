@@ -318,8 +318,17 @@ def train_full_model(X, df_y,
                                  eval_metric = 'logloss',
                                  learning_rate = 0.09,
                                  scale_pos_weight=estimate)
+        elif model_algo == 'XGB_hp':
+            clf = xgb.XGBClassifier(objective = "binary:logistic",
+                                use_label_encoder = False,
+                                eval_metric = 'logloss',
+                                max_depth = 5,
+                                learning_rate = 0.01,
+                                subsample = 0.9,
+                                colsample_bytree = 0.9)
         elif model_algo == 'SVC':
             clf = svm.SVC(probability=True)
+            
         elif model_algo == 'PCA-XGB':
             clf = Pipeline([('PCA', PCA(n_components=config.PCA_COMPONENTS)),
                             ('XGB_opt', xgb.XGBClassifier(objective = "binary:logistic",
@@ -333,7 +342,7 @@ def train_full_model(X, df_y,
         #print('Fit the model')
         #clf_fitted_dict[label] = clf.fit(Xtrain, y)
         clf.fit(Xtrain, y)
-        if model_algo in ['XGB', 'XGB_opt', 'XGB_imb']:
+        if model_algo in ['XGB', 'XGB_opt', 'XGB_imb', 'XGB_hp']:
             _,ax = plt.subplots(1,1,figsize=(10,10))
             plot_importance(clf, max_num_features=25, ax=ax)
             plt.show()

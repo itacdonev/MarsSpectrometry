@@ -1,21 +1,25 @@
-from logging import raiseExceptions
-from sklearn.model_selection import KFold,GroupKFold, StratifiedKFold
-from sklearn.preprocessing import LabelEncoder
+"""
+Training functions including cross validation and full
+model training.
+"""
+import os
+from collections import Counter
+import numpy as np
+import pandas as pd
+from termcolor import colored
+from sklearn.model_selection import StratifiedKFold
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from termcolor import colored
-from src import config, features, model_selection
+from sklearn import svm
 import lightgbm as lgb
 import xgboost as xgb
 from xgboost import plot_importance
-import numpy as np
-import pandas as pd
-import os
-from sklearn import svm
+from xgboost import plot_tree
 import matplotlib.pyplot as plt
+from src import config, features, model_selection
 
 def define_cvfolds(df, no_folds, SEED:int, 
                    group:str=None, strata:str=None):
@@ -147,12 +151,16 @@ def trainCV_label(X, df_y,
                 print(colored(f'X_valid={X_valid.shape}, y_valid={y_valid.shape}', 'magenta'))
                 print(f'Event rate (TRAIN) = {np.round(y_train.sum()/y_train.shape[0],2)}%')
                 print(f'Event rate (VALID) = {np.round(y_valid.sum()/y_valid.shape[0],2)}%')
-            
+
             #le = LabelEncoder()
             #X_train['instrument_type'] = le.fit_transform(X_train['instrument_type'])
             #X_valid['instrument_type'] = le.transform(X_valid['instrument_type'])
-    
-            # ----- TARGET ENCODING -----        
+
+            # Estimate scale_pos_weight arg for XGB
+            counter = Counter(y_train)
+            estimate = counter[0] / counter[1]
+
+            # ----- TARGET ENCODING -----
             if target_encode:
                 #print('Encoding ...')
                 if not target_encode_fts:
@@ -180,27 +188,33 @@ def trainCV_label(X, df_y,
                 Xvalid = X_valid.copy()
                 Xvalid.drop(target_encode_fts, axis=1, inplace=True)
             else:
-                Xtrain = X_train.copy()    
+                Xtrain = X_train.copy()
                 Xvalid = X_valid.copy()
+
+
+            # Initialize the classifier
+            if model_algo == 'XGB_imb':
+                clf = model_selection.models[model_algo]
+                clf.set_params(scale_pos_weight=estimate)
+            else:    
+                clf = model_selection.models[model_algo]
             
-            
-            # Traing the model
-            clf = model_selection.models[model_algo]
+            # Train a model
             clf.fit(Xtrain, y_train)
-            
+
             # Compute predictions
             y_preds = clf.predict_proba(Xvalid)[:,1]
-            
+
             # Compute model metric
             oof_logloss.append(model_metric(y_valid, y_preds))
-        
+
         # Average log loss per label
         logloss[label] = np.sum(oof_logloss)/cv_folds
 
     if verbose:
         print(f'Average Log Loss: {np.mean(list(logloss.values()))}')
         print(logloss)
-            
+
     return logloss
 
 
@@ -237,6 +251,10 @@ def train_full_model(X, df_y,
         # Select one label   
         print(colored(f'LABEL: {label}', 'blue'))
         y = df_y[label].copy().values
+
+        # estimate scale_pos_weight value for XGB
+        counter = Counter(y)
+        estimate = counter[0] / counter[1]
 
         # ----- TARGET ENCODING -----        
         if target_encode:
@@ -291,6 +309,13 @@ def train_full_model(X, df_y,
                                           use_label_encoder = False,
                                           eval_metric = 'logloss',
                                         learning_rate = 0.09)
+        elif model_algo == 'XGB_imb':
+            print(f'scale_pos_weight: {estimate}')
+            clf = xgb.XGBClassifier(objective = "binary:logistic",
+                                 use_label_encoder = False,
+                                 eval_metric = 'logloss',
+                                 learning_rate = 0.09,
+                                 scale_pos_weight=estimate)
         elif model_algo == 'SVC':
             clf = svm.SVC(probability=True)
         elif model_algo == 'PCA-XGB':
@@ -301,7 +326,7 @@ def train_full_model(X, df_y,
                                              learning_rate = 0.09))])
         elif model_algo == 'RFC':
             clf = RandomForestClassifier(random_state=config.RANDOM_SEED) 
-         
+
         # ===== FIT THE MODEL FOR LABEL =====
         #print('Fit the model')
         #clf_fitted_dict[label] = clf.fit(Xtrain, y)
@@ -310,10 +335,13 @@ def train_full_model(X, df_y,
             _,ax = plt.subplots(1,1,figsize=(10,10))
             plot_importance(clf, max_num_features=25, ax=ax)
             plt.show()
+            
+            plot_tree(clf, num_trees=6)
+            
         # Make predictions
         submission[label] = clf.predict_proba(Xtest)[:,1]
-        
-    return submission 
+
+    return submission
 
 
 def train_tbl(df_train, df_labels, 

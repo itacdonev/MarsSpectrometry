@@ -331,7 +331,7 @@ def train_full_model(X, df_y,
         #print('Fit the model')
         #clf_fitted_dict[label] = clf.fit(Xtrain, y)
         clf.fit(Xtrain, y)
-        if model_algo in ['XGB', 'XGB_opt']:
+        if model_algo in ['XGB', 'XGB_opt', 'XGB_imb']:
             _,ax = plt.subplots(1,1,figsize=(10,10))
             plot_importance(clf, max_num_features=25, ax=ax)
             plt.show()

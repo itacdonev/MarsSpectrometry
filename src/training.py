@@ -13,6 +13,7 @@ from sklearn.metrics import log_loss
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
+from sklearn.feature_selection import SelectFromModel
 from sklearn import svm
 import joblib
 import lightgbm as lgb
@@ -78,7 +79,9 @@ def trainCV_label(X, df_y,
                   model_algo, 
                   verbose:bool=False,
                   target_encode:bool=False,
-                  target_encode_fts:list=None):
+                  target_encode_fts:list=None,
+                  fts_select:bool=None,
+                  fts_select_cols:dict=None):
     """
     Training pipeline 
         - tabular one target label at a time
@@ -192,12 +195,17 @@ def trainCV_label(X, df_y,
                 Xtrain = X_train.copy()
                 Xvalid = X_valid.copy()
 
+            # ----- Feature selection ----- 
+            if fts_select:
+                fts_columns = fts_select_cols[label]
+                Xtrain = Xtrain[fts_columns].copy()
+                Xtest = Xtest[fts_columns].copy()
 
             # Initialize the classifier
             if model_algo == 'XGB_imb':
                 clf = model_selection.models[model_algo]
                 clf.set_params(scale_pos_weight=estimate)
-            else:    
+            else:
                 clf = model_selection.models[model_algo]
             
             # Train a model
@@ -219,14 +227,17 @@ def trainCV_label(X, df_y,
     return logloss
 
 
-def train_full_model(X, df_y, 
-                     target:list, 
-                     Xte, 
+def train_full_model(X,
+                     df_y,
+                     target:list,
+                     Xte,
                      sub_name,
                      model_algo:str,
                      target_encode:bool=None,
                      target_encode_fts:list=None,
                      test_sam:bool=False,
+                     fts_select:bool=None,
+                     fts_select_cols:dict=None
                      ):
     """
     Train full model
@@ -248,9 +259,9 @@ def train_full_model(X, df_y,
     #clf_fitted_dict = {}              # fitted classifiers
     #df_te_fitted = pd.DataFrame()     # target encoding
 
-    for label in label_names: 
-        
-        # Select one label   
+    for label in label_names:
+
+        # Select one label
         print(colored(f'LABEL: {label}', 'blue'))
         y = df_y[label].copy().values
 
@@ -258,7 +269,7 @@ def train_full_model(X, df_y,
         counter = Counter(y)
         estimate = counter[0] / counter[1]
 
-        # ----- TARGET ENCODING -----        
+        # ----- TARGET ENCODING -----
         if target_encode:
             #print('Encoding ...')
             if not target_encode_fts:
@@ -289,7 +300,13 @@ def train_full_model(X, df_y,
         else:
             Xtrain = X.copy()
             Xtest = Xte.copy()
-                    
+
+        # ----- Feature selection ----- 
+        if fts_select:
+            fts_columns = fts_select_cols[label]
+            Xtrain = Xtrain[fts_columns].copy()
+            Xtest = Xtest[fts_columns].copy()
+            
         # ----- MODEL SELECTION -----
         if model_algo == 'LR_reg':
             clf = LogisticRegression(penalty="l1",solver="liblinear", C=10, 
@@ -321,11 +338,8 @@ def train_full_model(X, df_y,
         elif model_algo == 'XGB_hp':
             clf = xgb.XGBClassifier(objective = "binary:logistic",
                                 use_label_encoder = False,
-                                eval_metric = 'logloss',
-                                max_depth = 5,
-                                learning_rate = 0.01,
-                                subsample = 0.9,
-                                colsample_bytree = 0.9)
+                                eval_metric = 'logloss',                                
+                                min_split_loss = 5)
         elif model_algo == 'SVC':
             clf = svm.SVC(probability=True)
             
@@ -338,13 +352,17 @@ def train_full_model(X, df_y,
         elif model_algo == 'RFC':
             clf = RandomForestClassifier(random_state=config.RANDOM_SEED) 
 
+
         # ===== FIT THE MODEL FOR LABEL =====
         #print('Fit the model')
         #clf_fitted_dict[label] = clf.fit(Xtrain, y)
         clf.fit(Xtrain, y)
-        if model_algo in ['XGB', 'XGB_opt', 'XGB_imb', 'XGB_hp']:
+            
+        # Feature importance plots
+        if model_algo in ['XGB', 'XGB_opt', 'XGB_imb', 'XGB_hp', 'XGB_sfm']:
             _,ax = plt.subplots(1,1,figsize=(10,10))
-            plot_importance(clf, max_num_features=25, ax=ax)
+            plot_importance(clf, max_num_features=30, height=0.5,
+                            importance_type='gain', ax=ax)
             plt.show()
             #TODO install graphviz to plot tree
             #plot_tree(clf, num_trees=6)
@@ -359,18 +377,18 @@ def train_full_model(X, df_y,
     return submission
 
 
-def train_tbl(df_train, df_labels, 
-              target_list, 
-              df_test, 
-              model_algo, 
-              sub_name:str, 
-              target_encode:bool=None, 
+def train_tbl(df_train, df_labels,
+              target_list,
+              df_test,
+              model_algo,
+              sub_name:str,
+              target_encode:bool=None,
               target_encode_fts:list=None,
               verbose:bool=False,
               test_sam:bool=False):
     """
     Train tabular data. The training is done on CV and full dataset.
-    
+
     Arguments
     ---------
         df_train: pandas data frame or name of the saved table in
@@ -378,11 +396,11 @@ def train_tbl(df_train, df_labels,
     """
     # Read in the data
     if not isinstance(df_train, pd.DataFrame):
-        df_train = pd.read_csv(os.path.join(config.DATA_DIR_OUT + 
+        df_train = pd.read_csv(os.path.join(config.DATA_DIR_OUT +
                                             df_train + '.csv'))
-    
-    if not isinstance(df_test, pd.DataFrame):  
-        df_test = pd.read_csv(os.path.join(config.DATA_DIR_OUT + 
+
+    if not isinstance(df_test, pd.DataFrame):
+        df_test = pd.read_csv(os.path.join(config.DATA_DIR_OUT +
                                             df_test + '.csv'))
         
     # CV TRAINING

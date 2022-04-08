@@ -385,7 +385,9 @@ def train_tbl(df_train, df_labels,
               target_encode:bool=None,
               target_encode_fts:list=None,
               verbose:bool=False,
-              test_sam:bool=False):
+              test_sam:bool=False,
+              fts_select:bool=None,
+              fts_select_cols:dict=None):
     """
     Train tabular data. The training is done on CV and full dataset.
 
@@ -413,7 +415,9 @@ def train_tbl(df_train, df_labels,
                                   model_algo=model_algo,
                                   target_encode=target_encode,
                                   verbose=verbose,
-                                  target_encode_fts=target_encode_fts)
+                                  target_encode_fts=target_encode_fts,
+                                  fts_select=fts_select,
+                                  fts_select_cols=fts_select_cols)
     
     train_cv_loss_df = pd.DataFrame.from_dict(train_cv_loss, orient='index')
     train_cv_loss_df.columns = [sub_name]
@@ -431,7 +435,9 @@ def train_tbl(df_train, df_labels,
                                   model_algo=model_algo,
                                   target_encode=target_encode,
                                   target_encode_fts=target_encode_fts,
-                                  test_sam=test_sam)
+                                  test_sam=test_sam,
+                                  fts_select=fts_select,
+                                  fts_select_cols=fts_select_cols)
     
     # Save submission file
     submission.to_csv(config.MODELS_DIR + sub_name + '.csv')

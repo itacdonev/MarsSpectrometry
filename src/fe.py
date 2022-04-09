@@ -291,7 +291,7 @@ class CreateFeatures:
             elif np.round(Mp1_isotope,1) in pd.Interval(0.7,0.9, closed='both'):
                 temp['hi1'] =  32. #'S'
             else: temp['hi1'] = ''
-            
+
             # 2nd heavy isotopes
             if np.round(Mp2_isotope,1) in pd.Interval(0.1, 0.3, closed='both'):
                 temp['hi2'] = 16. #'O'
@@ -304,32 +304,104 @@ class CreateFeatures:
             elif np.round(Mp2_isotope,1) in pd.Interval(97.9,98.1, closed='both'):
                 temp['hi2'] =  79.9 #'Br'
             else: temp['hi2'] = ''
-            
+
             #TODO Adjusted M+1 and M+2
-            
+
             # Number of carbons
             #TODO Needs correction if there are present 1st and 2nd isotopes
-            temp['C_cnt'] = features.get_no_carbons(df_sample)
-            
-            
+            temp['C_cnt'] = features.get_no_carbons(df_sample)            
+
             # Presence of nitrogen
             # an even molecular ion indicates the sample lacks nitrogen
             #N_cnt = nitrogen_rule(df_sample)
             #temp['N_cnt'] = N_cnt
-                
+
             # Difference between molecular ion and its first fragment peak
             mi_frg_diff = features.get_moli_frag_peak_diff(df_sample)
             temp['mi_frg_diff'] = mi_frg_diff
-            
-            
-            
-                
+
             df = pd.concat([df, temp], axis=0)
-            df = df.reset_index(drop=True)
-            
+            del df['sample_id']
+
             # Save feature data frame
             df.to_csv(os.path.join(config.DATA_DIR_OUT,
                                     self.fts_name + '_' + self.file_suffix + '.csv'),
                             index=False)
-        
+
         return df
+
+
+    def fts_area_sample(self):
+        """
+        Compute the area under the smoothed abundance
+        curve for a sample.
+        """
+        areas_dict = {}
+        
+        for idx in tqdm(self.files_dict):
+            sample_name = self.metadata.iloc[idx]['sample_id']
+            area_sample = features.sample_abund_area(self.metadata, 
+                                                    idx, 
+                                                    self.detrend_method)
+            areas_dict[idx] = area_sample
+            
+        # Convert into a dataframe and save
+        df_area = pd.DataFrame.from_dict(areas_dict, orient='index')
+        df_area.columns = ['area']
+        
+        # Save feature data frame
+        df_area.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                    self.fts_name + '_' + self.file_suffix + '.csv'),
+                         index=False)
+        
+        return df_area
+
+
+    def fts_area_contrib_temp(self):
+        """
+        - Divide the temp into bins
+        - Compute area for each bin.
+        - Compute percentage area of the temp bin in terms of 
+          total area - contribution of the temp bin to total m/z 
+          value in area.
+        """
+        # features.area_contrib_temp()
+        pass
+
+
+    def fts_range_abun_to_temp(self):
+        """
+        Compute ratio of abundance to temperature for each 
+        observation in the sample. Then we divide the temperature
+        into bins and compute the range of the computed ratio
+        for each temp bin.
+        """
+        df = pd.DataFrame(()
+                          )
+        for idx in tqdm(self.files_dict):
+            df_range_att_sample = features.range_abun_to_temp(self.metadata,
+                                                              idx,
+                                                              self.detrend_method)
+
+            df = pd.concat([df, df_range_att_sample], axis=0)
+            
+        # Save the data set
+        df.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                    self.fts_name + '_' + self.file_suffix + '.csv'),
+                         index=False)
+
+        df = df.replace(np.nan, 0)
+
+        return df
+
+        
+        
+        
+        
+    def fts_mzstats():
+        pass
+
+
+    def fts_topmz():
+        pass
+

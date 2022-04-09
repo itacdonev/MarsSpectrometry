@@ -213,10 +213,10 @@ def features_iontemp_area(df_meta, sample_list, detrend_method:str,
     
     
 # ===== Duration to max temperature per ion =====
-def ion_duration_maxtemp(df_sample, ion_list):
+def ion_duration_maxtemp(df_sample, ion_list, detrend_method):
     
     # Preprocess the sample data
-    df_sample = preprocess.preprocess_samples(df_sample)
+    df_sample = preprocess.preprocess_samples(df_sample, detrend_method=detrend_method)
 
     # Initialize dictionary
     ion_time_dict = {}
@@ -633,21 +633,29 @@ def features_ion_peaks(file_paths:dict, metadata, detrend_method):
     
     return df
 
-# ===== AREAS =====
+# ===== AREA - SAMPLE =====
 
 def sample_abund_area(metadata, idx, detrend_method):
-    # Compute the area under the abun_scaled for
-    # the whole sample
+    """
+    Compute the area under the abun_scaled for
+    the whole sample given time.
+    """
     df_sample = preprocess.get_sample(metadata, idx)
     df_sample = preprocess.preprocess_samples(df_sample, detrend_method=detrend_method)
     df_sample = df_sample.sort_values(by=['time', 'abun_scaled'])
-    
+
+    # Sum all mz values per time to get a sample mz value per time
+    df_sample['abun_sum_time'] = df_sample.groupby('time')['abun_scaled'].transform('sum')
+    df_sample = df_sample[['time', 'abun_sum_time']].drop_duplicates().copy()
+
     x = df_sample['time'].values
-    y = df_sample['abun_scaled'].values
+    y = df_sample['abun_sum_time'].values
     area = np.trapz(y=y,x=x)
-    
+
     return area
 
+
+# fts_area_sample
 def features_area(files, metadata, detrend_method):
     
     areas_dict = {}
@@ -658,7 +666,13 @@ def features_area(files, metadata, detrend_method):
         areas_dict[idx] = area_sample
         
     return areas_dict
-        
+
+
+# ===== AREA - CONTRIBUTION PER TEMP BIN =====
+
+
+
+
 
 # ===== DEEP LEARNING =====
 def dl_time_pivot(metadata, n_sample, max_time):

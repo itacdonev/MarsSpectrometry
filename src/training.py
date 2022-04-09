@@ -461,7 +461,8 @@ def compute_valid_loss(submission_file_VT,
                        valid_files,
                        valid_labels, 
                        target_label_list,
-                       sub_name:str):
+                       sub_name:str,
+                       fts_select_cols:bool=False):
     """
     Compute validation loss.
     Model is trained only on TRAIN data set.
@@ -474,7 +475,7 @@ def compute_valid_loss(submission_file_VT,
     for label in target_label_list:
         y_actual = valid_labels[label].iloc[:len(valid_files)]
         y_preds = df_sub[label].iloc[:len(valid_files)]
-        model_ll[label] = log_loss(y_actual, y_preds, labels=(0,1))
+        model_ll[label] = log_loss(y_actual.values, y_preds.values, labels=(0,1))
         
     #print(f'Average Log Loss of full model: {np.mean(list(model_ll.values()))}')
     valid_loss = pd.DataFrame.from_dict(model_ll, orient='index')

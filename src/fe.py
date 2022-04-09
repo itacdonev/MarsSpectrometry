@@ -83,8 +83,8 @@ class CreateFeatures:
         return df_fts
 
 
-    # Correlation mz4 with other mz values
-    def fts_corr_mz4(self):
+    # Slope of correlation mz4 with other mz values
+    def fts_lr_corr_mz4(self):
         """
         Compute linear relationship between
         correlation of mz=4 and other mz values.
@@ -117,6 +117,30 @@ class CreateFeatures:
         return df_corr
 
 
+    def fts_corr_mz4(self):
+        """Correlation between mz4 and other mz ratios.
+        """
+        df = pd.DataFrame()
+
+        for idx in tqdm(self.files_dict):
+            df_sample = preprocess.get_sample(self.metadata, idx)
+            df_sample = preprocess.preprocess_samples(df_sample,
+                                                    detrend_method='min',
+                                                    remove_He=False)
+            sample_name = self.metadata.iloc[idx]['sample_id']
+            df_corr = features.corr_mz4(df_sample, sample_name)
+            df = pd.concat([df, df_corr], axis=0)
+        
+        df = df.replace(np.nan, 0)
+        
+        # Save file
+        df.to_csv(os.path.join(config.DATA_DIR_OUT,
+                               self.fts_name + '_' + self.file_suffix + '.csv'),
+                        index=False)
+        
+        return df
+        
+    
     # TempBin+MZ = Max relative abundance
     def fts_mra_tempmz(self):
         """

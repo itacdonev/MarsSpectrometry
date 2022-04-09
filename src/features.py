@@ -646,7 +646,10 @@ def sample_abund_area(metadata, idx, detrend_method):
 
     # Sum all mz values per time to get a sample mz value per time
     df_sample['abun_sum_time'] = df_sample.groupby('time')['abun_scaled'].transform('sum')
-    df_sample = df_sample[['time', 'abun_sum_time']].drop_duplicates().copy()
+    df_sample = df_sample[['time', 'abun_sum_time']]\
+                    .drop_duplicates()\
+                    .sort_values(by=['time', 'abun_sum_time'])\
+                    .copy()
 
     x = df_sample['time'].values
     y = df_sample['abun_sum_time'].values
@@ -669,6 +672,86 @@ def features_area(files, metadata, detrend_method):
 
 
 # ===== AREA - CONTRIBUTION PER TEMP BIN =====
+
+def area_contrib_temp(metadata, idx, detrend_method):
+    #TODO FInish - the values look a bit weird
+    # Read in the sample
+    df_sample = preprocess.get_sample(metadata, idx)
+    df_sample = preprocess.preprocess_samples(df_sample, detrend_method)
+
+    # COmpute area for the sample
+    sample_area = sample_abund_area(metadata, idx, detrend_method)
+    
+    # Define the temperature bins
+    temprange = pd.interval_range(start=-100, end=1500, freq=100)
+    df_sample['temp_bin'] = pd.cut(df_sample['temp'], bins=temprange)
+    
+    # Compute areas per temp bin
+    temp_bin_areas_dict = {}
+    temp_bin_list = df_sample['temp_bin'].unique().tolist()
+    for bin in temp_bin_list:
+        df_temp = df_sample[df_sample.temp_bin == bin][['time', 'abun_scaled']].copy()
+        df_temp = df_temp.sort_values(by='time')
+        x = df_temp['time'].values
+        y = df_temp['abun_scaled'].values
+        temp_bin_areas_dict[bin] = (np.trapz(y=y,x=x) / sample_area) * 100
+    
+    return temp_bin_areas_dict
+
+
+
+
+# ===== ABUNDANCE TO TEMP =====
+
+def range_abun_to_temp(metadata, idx, detrend_method):
+    """
+    Compute ratio of abundance value to temperature.
+    Divide temp into bins and for each bin and m/z value
+    compute range of ratios of abundance to temperature.
+    The goal is to see how some m/z values are affected by 
+    temp value.
+    """
+    # Read in the sample
+    df_sample = preprocess.get_sample(metadata, idx)
+    df_sample = preprocess.preprocess_samples(df_sample, detrend_method)
+    sample_name = metadata.iloc[idx]['sample_id']
+
+    temprange = pd.interval_range(start=-100, end=1500, freq=100)
+    df_sample['temp_bin'] = pd.cut(df_sample['temp'], bins=temprange)
+
+    # Abundance as a function of temperature
+    df_sample['abun_temp_perc'] = df_sample['abun_scaled'] / df_sample['temp']
+
+    # Compute the range for each m/z
+    df_sample['abun_to_temp_range'] = df_sample\
+        .groupby(['temp_bin', 'm/z'])['abun_temp_perc']\
+        .transform(np.ptp)
+    df_sample = df_sample[['temp_bin','m/z','abun_to_temp_range']].drop_duplicates().reset_index(drop=True)
+    df_sample['sample_id'] = sample_name
+
+    # Fix m/z adn temp-bin names 
+    df_sample['m/z'] = ['mz_'+str(i) for i in df_sample['m/z']]
+    df_sample['m/z'] = [i.removesuffix('.0') for i in df_sample['m/z']]
+    df_sample['temp_bin'] = ['temp_'+str(i) for i in df_sample['temp_bin']]
+    
+    # Turn into a pivot where columns are combo of temp_bin & m/z
+    # and values are abun_to_temp_range
+    df_sample_pivot = df_sample.pivot(columns=['temp_bin', 'm/z'], 
+                                      values='abun_to_temp_range',
+                                      index='sample_id')
+    # Join multiple column indices
+    df_sample_pivot.columns = df_sample_pivot.columns.map(lambda x: '_'.join([str(i) for i in x]))
+    # Rename columns
+    t_cols = df_sample_pivot.columns
+    remove_chars = "(,]"
+    for char in remove_chars:
+        t_cols = [i.replace(char,'') for i in t_cols]
+    t_cols = [i.replace(' ','_') for i in t_cols]
+    df_sample_pivot.columns = t_cols
+    # Add prefix to column names
+    df_sample_pivot = df_sample_pivot.add_prefix('r_abun_temp_')
+
+    return df_sample_pivot
 
 
 
@@ -825,6 +908,47 @@ def slope_time_temp(train_files:dict, metadata, detrend_method):
         coefs_lr[sample_name] = lr.coef_[0]
 
     return coefs_lr
+
+
+
+def corr_mz4(df_sample,
+             sample_name:str,
+             corr_method:str='spearman'):
+    """
+    Correlation of mz=4 with other mz values.
+    """
+    mz_list = df_sample['m/z'].unique().tolist()
+    
+    if 4.0 in mz_list:
+        # Create a pivot table so that each m/z value is a column
+        df_sample = df_sample.pivot(index='time',
+                                    columns='m/z',
+                                    values='abun_scaled')
+
+        # Compute correlation
+        df_corr = df_sample.corr(method=corr_method)
+        # Remove m/z 4 from index and select only mz4 from the columns
+        # to get mz4 correlation with all other mz values
+        df_corr = df_corr[df_corr.index != 4.0][[4.0]]
+        # Reset index to get mz as a column
+        df_corr = df_corr.reset_index()
+        df_corr.columns = ['m/z', 'mz_4']
+    else:
+        df_corr = pd.DataFrame()
+
+    # Add sample_id
+    df_corr['sample_id'] = sample_name
+
+    # Fix column names
+    df_corr['m/z'] = [str(i).removesuffix(".0") for i in df_corr['m/z']]
+    df_corr['m/z'] = ['mz_' + str(i) for i in df_corr['m/z']]
+    
+    # Create a data frame where m/z values are columns
+    df_corr_pivot = df_corr.pivot(index='sample_id',
+                                   columns='m/z',
+                                   values='mz_4')
+
+    return df_corr_pivot
 
 
 def lr_corr_mz4(df_sample, 

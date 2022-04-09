@@ -910,6 +910,7 @@ def slope_time_temp(train_files:dict, metadata, detrend_method):
     return coefs_lr
 
 
+# ===== CORRELATION WITH MZ4 =====
 
 def corr_mz4(df_sample,
              sample_name:str,
@@ -933,20 +934,24 @@ def corr_mz4(df_sample,
         # Reset index to get mz as a column
         df_corr = df_corr.reset_index()
         df_corr.columns = ['m/z', 'mz_4']
+        
+        # Fix column names
+        df_corr['m/z'] = [str(i).removesuffix(".0") for i in df_corr['m/z']]
+        df_corr['m/z'] = ['mz_' + str(i) for i in df_corr['m/z']]
+        
     else:
-        df_corr = pd.DataFrame()
-
+        df_corr = pd.DataFrame(index=mz_list)
+        df_corr = df_corr.reset_index()
+        df_corr.columns = ['m/z']
+        df_corr['mz_4'] = np.nan
+    
     # Add sample_id
     df_corr['sample_id'] = sample_name
 
-    # Fix column names
-    df_corr['m/z'] = [str(i).removesuffix(".0") for i in df_corr['m/z']]
-    df_corr['m/z'] = ['mz_' + str(i) for i in df_corr['m/z']]
-    
     # Create a data frame where m/z values are columns
     df_corr_pivot = df_corr.pivot(index='sample_id',
-                                   columns='m/z',
-                                   values='mz_4')
+                                columns='m/z',
+                                values='mz_4')
 
     return df_corr_pivot
 

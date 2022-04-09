@@ -6,6 +6,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.decomposition import PCA
 from sklearn.pipeline import Pipeline
+from sklearn.feature_selection import SelectFromModel
 from sklearn import svm
 import xgboost as xgb
 import lightgbm as lgb
@@ -42,14 +43,11 @@ models = {
                                  use_label_encoder = False,
                                  eval_metric = 'logloss',
                                  learning_rate = 0.09))]),
-    
+        
     'XGB_hp': xgb.XGBClassifier(objective = "binary:logistic",
                                 use_label_encoder = False,
                                 eval_metric = 'logloss',
-                                max_depth = 5,
-                                learning_rate = 0.01,
-                                subsample = 0.9,
-                                colsample_bytree = 0.9),
+                                min_split_loss = 5),
     
     'SVC': svm.SVC(probability=True),
     'PCA-XGB': Pipeline([('PCA', PCA(n_components=config.PCA_COMPONENTS)),

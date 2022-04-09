@@ -13,13 +13,12 @@ from sklearn.metrics import log_loss
 from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
-from sklearn.feature_selection import SelectFromModel
 from sklearn import svm
 import joblib
 import lightgbm as lgb
 import xgboost as xgb
 from xgboost import plot_importance
-from xgboost import plot_tree
+#from xgboost import plot_tree
 import matplotlib.pyplot as plt
 from src import config, features, model_selection
 
@@ -80,7 +79,6 @@ def trainCV_label(X, df_y,
                   verbose:bool=False,
                   target_encode:bool=False,
                   target_encode_fts:list=None,
-                  fts_select:bool=None,
                   fts_select_cols:dict=None):
     """
     Training pipeline 
@@ -196,10 +194,10 @@ def trainCV_label(X, df_y,
                 Xvalid = X_valid.copy()
 
             # ----- Feature selection ----- 
-            if fts_select:
+            if fts_select_cols:
                 fts_columns = fts_select_cols[label]
                 Xtrain = Xtrain[fts_columns].copy()
-                Xtest = Xtest[fts_columns].copy()
+                Xvalid = Xvalid[fts_columns].copy()
 
             # Initialize the classifier
             if model_algo == 'XGB_imb':
@@ -236,7 +234,6 @@ def train_full_model(X,
                      target_encode:bool=None,
                      target_encode_fts:list=None,
                      test_sam:bool=False,
-                     fts_select:bool=None,
                      fts_select_cols:dict=None
                      ):
     """
@@ -302,7 +299,7 @@ def train_full_model(X,
             Xtest = Xte.copy()
 
         # ----- Feature selection ----- 
-        if fts_select:
+        if fts_select_cols:
             fts_columns = fts_select_cols[label]
             Xtrain = Xtrain[fts_columns].copy()
             Xtest = Xtest[fts_columns].copy()
@@ -368,8 +365,12 @@ def train_full_model(X,
             #plot_tree(clf, num_trees=6)
 
         # save model to file
-        joblib.dump(clf, os.path.join(config.MODELS_DIR,
-                                      sub_name + '_' + label + ".joblib.dat"))
+        if fts_select_cols:
+            joblib.dump(clf, os.path.join(config.MODELS_DIR,
+                                        sub_name + '_sfm_' + label + ".joblib.dat"))    
+        else:
+            joblib.dump(clf, os.path.join(config.MODELS_DIR,
+                                        sub_name + '_' + label + ".joblib.dat"))
 
         # Make predictions
         submission[label] = clf.predict_proba(Xtest)[:,1]
@@ -386,7 +387,6 @@ def train_tbl(df_train, df_labels,
               target_encode_fts:list=None,
               verbose:bool=False,
               test_sam:bool=False,
-              fts_select:bool=None,
               fts_select_cols:dict=None):
     """
     Train tabular data. The training is done on CV and full dataset.
@@ -416,14 +416,20 @@ def train_tbl(df_train, df_labels,
                                   target_encode=target_encode,
                                   verbose=verbose,
                                   target_encode_fts=target_encode_fts,
-                                  fts_select=fts_select,
                                   fts_select_cols=fts_select_cols)
     
     train_cv_loss_df = pd.DataFrame.from_dict(train_cv_loss, orient='index')
-    train_cv_loss_df.columns = [sub_name]
+    if fts_select_cols:
+        train_cv_loss_df.columns = [sub_name + '_sfm']
+    else:
+        train_cv_loss_df.columns = [sub_name]
     train_cv_loss_df.index = train_cv_loss_df.index.set_names('target')
-    train_cv_loss_df.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_cvloss.csv'),
-                            index=True)
+    if fts_select_cols:
+        train_cv_loss_df.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_sfm_cvloss.csv'),
+                                index=True)
+    else:
+        train_cv_loss_df.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_cvloss.csv'),
+                                index=True)
     
     # FULL TRAINING
     print(colored('Full training .....', 'blue'))
@@ -436,11 +442,13 @@ def train_tbl(df_train, df_labels,
                                   target_encode=target_encode,
                                   target_encode_fts=target_encode_fts,
                                   test_sam=test_sam,
-                                  fts_select=fts_select,
                                   fts_select_cols=fts_select_cols)
     
     # Save submission file
-    submission.to_csv(config.MODELS_DIR + sub_name + '.csv')
+    if fts_select_cols:
+        submission.to_csv(config.MODELS_DIR + sub_name + '_sfm.csv')
+    else:
+        submission.to_csv(config.MODELS_DIR + sub_name + '.csv')
     
     print(colored(f'\nAverage Log Loss: {np.round(np.mean(list(train_cv_loss.values())), 4)}', 'blue'))
     print('Log Loss per Label:')
@@ -472,7 +480,11 @@ def compute_valid_loss(submission_file_VT,
     valid_loss = pd.DataFrame.from_dict(model_ll, orient='index')
     valid_loss.columns = [sub_name + 'V']
     valid_loss.index = valid_loss.index.set_names('target')
-    valid_loss.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_Vloss.csv'),
-                            index=True)
+    if fts_select_cols:
+        valid_loss.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_sfm_Vloss.csv'),
+                                index=True)
+    else:
+        valid_loss.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_Vloss.csv'),
+                                index=True)
 
     return model_ll, np.mean(list(model_ll.values()))

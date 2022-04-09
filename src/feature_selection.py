@@ -12,7 +12,7 @@ from sklearn.metrics import log_loss
 from src import config, model_selection
 
 def thrs_value_label(target_labels_list:list,
-                     sfm_model:str,
+                     sfm_model_name:str,
                      sfm_feature:str,
                      model_algo:str,
                      X_tr,
@@ -30,7 +30,7 @@ def thrs_value_label(target_labels_list:list,
     thrs_value = {}
     for label in tqdm(target_labels_list):
         print(colored(f'LABEL: {label}', 'blue'))
-        MODEL_CLF = sfm_model + '_' + label + '.joblib.dat'
+        MODEL_CLF = sfm_model_name + '_' + label + '.joblib.dat'
         #VT_SAMPLE = sfm_feature + '_vlte.csv'
         # Load saved model and compute thresholds
         clf = joblib.load(os.path.join(config.MODELS_DIR, MODEL_CLF))
@@ -60,10 +60,10 @@ def thrs_value_label(target_labels_list:list,
                 thrs_best = thrs
         thrs_value[label] = thrs_best
     
-    df_thrs = pd.DataFrame.from_dict(proba, orient='index')
-    df_thrs.columns = [sfm_model]
+    df_thrs = pd.DataFrame.from_dict(thrs_value, orient='index')
+    df_thrs.columns = [sfm_model_name]
     df_thrs.index = df_thrs.index.set_names('target')
-    df_thrs.to_csv(os.path.join(config.MODELS_DIR, sfm_model + '_sfmt.csv'),
+    df_thrs.to_csv(os.path.join(config.MODELS_DIR, sfm_model_name + '_sfmt.csv'),
                                 index=True)
     
     return thrs_value
@@ -77,8 +77,14 @@ def save_features(fts_name, split_type, sfm_features_dict):
         file.write(json.dumps(sfm_features_dict))    
 
 
+def load_features(path_cols):
+    with open(path_cols) as json_file:
+            sfm_columns = json.load(json_file)
+    return sfm_columns 
+            
+            
 def fts_select_columns(target_labels_list:list,
-                        sfm_model:str,
+                        sfm_model_name:str,
                         sfm_feature:str,
                         model_algo:str,
                         split_type:str,
@@ -92,7 +98,7 @@ def fts_select_columns(target_labels_list:list,
     sfm_features_dict = {}
     for label in tqdm(target_labels_list):
         print(colored(f'LABEL: {label}', 'blue'))
-        MODEL_CLF = sfm_model + '_' + label + '.joblib.dat'
+        MODEL_CLF = sfm_model_name + '_' + split_type + '_' + label + '.joblib.dat'
         #VT_SAMPLE = sfm_feature + '_vlte.csv'
         # Load saved model and compute thresholds
         clf = joblib.load(os.path.join(config.MODELS_DIR, MODEL_CLF))
@@ -121,43 +127,49 @@ def fts_select_columns(target_labels_list:list,
             
     return sfm_loss, sfm_features_dict
 
-def fts_select(target_labels_list, sfm_feature, sfm_model, split_type,
-               X_tr, X_vlte, train_labels, valid_files, valid_labels):
-    # Check whether there are computed thresholds
-    for i in ['_tr']:
-        path = os.path.join(config.MODELS_DIR,
-                            sfm_model + str(i) + '_sfmt.csv')
-        print(path)
-        if os.path.exists(path):
-            print('Reading thresholds ...')
-            df_temp = pd.read_csv(path, index_col='target')
-            sfm_thrs = df_temp.to_dict()[sfm_model]
-        else:
-            print('Computing thresholds ...')
-            sfm_thrs= thrs_value_label(
-                        target_labels_list,
-                        sfm_model + '_' + split_type,
-                        sfm_feature,
-                        model_algo,
-                        X_tr,
-                        X_vlte,
-                        train_labels,
-                        valid_files,
-                        valid_labels)
-    
-    # Get or compute the selected columns
+def fts_select(target_labels_list, sfm_feature, sfm_model_name, model_algo,
+               split_type, X_tr, X_vlte, 
+               train_labels, valid_files, valid_labels):
+    # Check whether there exists a file with feature dictionary
+    # for the base model. If so, read it in.
     path_cols = os.path.join(config.MODELS_DIR,
                              sfm_feature + '_' + split_type + '_SFM_COLS.txt')
     if os.path.exists(path_cols):
-        print('Reading columns ...')    
+        print(f'Reading columns from {path_cols}')    
         with open(path_cols) as json_file:
             sfm_columns = json.load(json_file)
         return None, sfm_columns
+    
+    # If there is no file with features dict then compute
+    # thresholds and then features
     else:
+        # Check whether there are computed thresholds
+        for i in ['_tr']:
+            path = os.path.join(config.MODELS_DIR,
+                                sfm_model_name + str(i) + '_sfmt.csv')
+            print(path)
+            if os.path.exists(path):
+                print(f'Reading thresholds from {path}')
+                df_temp = pd.read_csv(path, index_col='target')
+                sfm_thrs = df_temp.to_dict()[sfm_model_name]
+            else:
+                print('Computing thresholds ...')
+                sfm_thrs= thrs_value_label(
+                            target_labels_list,
+                            sfm_model_name + '_' + split_type,
+                            sfm_feature,
+                            model_algo,
+                            X_tr,
+                            X_vlte,
+                            train_labels,
+                            valid_files,
+                            valid_labels)
+    
+    
         print('Computing columns ...')    
         sfm_loss, sfm_columns = fts_select_columns(
                         target_labels_list,
-                        sfm_model + '_' + split_type,
+                        sfm_model_name,
                         sfm_feature,
                         model_algo,
                         split_type,
@@ -167,14 +179,35 @@ def fts_select(target_labels_list, sfm_feature, sfm_model, split_type,
                         valid_files,
                         valid_labels,
                         sfm_thrs)
+
         return sfm_loss, sfm_columns
     
 
+
+def remove_cols(base_fts, cols_to_remove, target_labels_list):
+    """
+    Remove features from an existing dictionary of features. 
+    """
+    # Loop through each target label and add feaure if there is any
+    for label in target_labels_list:
+        if label in cols_to_remove:
+            fts = cols_to_remove[label]
+            base_fts[label].remove(fts)
+
+    return base_fts
+
+
 def update_fts_columns(target_labels_list,
+                       sfm_feature,
+                       sfm_model_name,
                         base_model,
+                        model_algo,
                         model_suffix, 
                         cvloss, 
-                        new_model_cols):
+                        base_fts,
+                        new_model_cols,
+                        X_tr, X_vlte, 
+                        train_labels, valid_files, valid_labels):
     """
     Check whether the cvloss is less than in the base
     model and if so add retain the feature. This is only
@@ -196,20 +229,17 @@ def update_fts_columns(target_labels_list,
             new_loss = cvloss[i]
             if new_loss > base_loss:
                 cols_to_remove[i] = new_model_cols[0]
-    
-        return cols_to_remove
-    else:
-        print('Need to finish')
-        
-        
-def remove_cols(base_fts, cols_to_remove, target_labels_list):
-    """
-    Remove features from an existing dictionary of features. 
-    """
-    # Loop through each target label and add feaure if there is any
-    for label in target_labels_list:
-        if label in cols_to_remove:
-            fts = cols_to_remove[label]
-            base_fts[label].remove(fts)
 
-    return base_fts
+        sfm_columns = remove_cols(base_fts, cols_to_remove, target_labels_list)
+    
+    else:
+        # Run threshold computation and feature selection 
+        # given a new model
+        sfm_loss, sfm_columns = fts_select(target_labels_list, 
+                                           sfm_feature, 
+                                           sfm_model_name, 
+                                           model_algo,
+                                           model_suffix, X_tr, X_vlte, 
+                                           train_labels, valid_files, valid_labels)
+        
+    return sfm_columns

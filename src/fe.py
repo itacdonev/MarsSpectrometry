@@ -116,7 +116,7 @@ class CreateFeatures:
 
         return df_corr
 
-
+    # Correlation of mz4 and other mz values
     def fts_corr_mz4(self):
         """Correlation between mz4 and other mz ratios.
         """
@@ -197,7 +197,7 @@ class CreateFeatures:
             
         return dt
     
-    
+    # Count no peaks per mz, mra, time and temp at 1st peak  
     def fts_cntpk_mratt(self):
         """
         Combines all computed ion peaks stats from each sample
@@ -231,7 +231,7 @@ class CreateFeatures:
 
         return df
 
-
+    # Slope of time ~ temp
     def fts_slope_tt(self):
         """
         Compute slope of time ~ temp for each sample using
@@ -264,7 +264,7 @@ class CreateFeatures:
         
         return df_slope
 
-
+    # Spectra information per sample
     def fts_spectra(self): #features_ms
         """
         Features from mass spectra.
@@ -354,7 +354,7 @@ class CreateFeatures:
 
         return df
 
-
+    # Abundance area of sample
     def fts_area_sample(self):
         """
         Compute the area under the smoothed abundance
@@ -380,7 +380,7 @@ class CreateFeatures:
         
         return df_area
 
-
+    #TODO Contribution of tempbin area to the whole area
     def fts_area_contrib_temp(self):
         """
         - Divide the temp into bins
@@ -392,7 +392,7 @@ class CreateFeatures:
         # features.area_contrib_temp()
         pass
 
-
+    # Range abundance/temperature in each temp bin
     def fts_range_abun_to_temp(self):
         """
         Compute ratio of abundance to temperature for each 
@@ -421,9 +421,47 @@ class CreateFeatures:
         
         
         
+    # Statistics of each mz in the sample: mean, median, std, kurt, skew
+    def fts_mzstats(self):
+        """
+        Statistics of each mz in the sample: mean, median, std, kurt, skew
+        """
+        df = pd.DataFrame()
+    
+        for file_idx in tqdm(self.files_dict): #idx
+            #print(file_idx)
+            temp = {}
+            
+            # Select a sample and get sample name
+            df_sample = preprocess.get_sample(self.metadata, file_idx)
+            sample_name = self.metadata.iloc[file_idx]['sample_id']
+            temp['sample_id'] = sample_name
+            
+            # Preprocess the sample
+            df_sample = preprocess.preprocess_samples(df_sample,
+                                                    detrend_method=self.detrend_method)
+            
+            # Statistics
+            sample_stats = features.get_mz_stats(df_sample, sample_name)
+            
+            # Fix columns names
+            sample_stats['m/z'] = ['mz_'+str(i) for i in sample_stats['m/z']]
+            sample_stats['m/z'] = [i.removesuffix(".0") for i in sample_stats['m/z']]
+
+            # Prepare the df
+            stats_pivot = sample_stats.pivot(index='sample_id', columns='m/z')
+            df = pd.concat([df, stats_pivot], axis=0)
         
-    def fts_mzstats():
-        pass
+        df = df.fillna(0)
+        df.columns = df.columns.map(lambda x: '_'.join([str(i) for i in x]))
+        
+        # Save feature data frame
+        df.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                    self.fts_name + '_' + self.file_suffix + '.csv'),
+                         index=False)
+
+        return df
+
 
 
     def fts_topmz():

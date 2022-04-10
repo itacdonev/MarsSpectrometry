@@ -261,7 +261,7 @@ def features_ion_duration_maxtemp(df_meta, file_paths, ion_list):
 
 
         
-# ===== MOLECULAR ION DETECTION =====
+# ===== SPECTRA - MOLECULAR ION DETECTION =====
 
 def get_all_peaks(df_sample):
     """
@@ -434,14 +434,20 @@ def features_ms(metadata, file_list, detrend_method):
     return df.reset_index(drop=True)
         
         
-# ===== STATISTICS =====
+# ===== MZ STATISTICS =====
 
-def get_mz_stats(df_sample, sample_name):
+def get_mz_stats(df_sample, sample_name, smooth):
     
-    sample_stats = df_sample.groupby('m/z')\
-        .agg({'abun_scaled': ['mean', 'median', 'std',
-                               pd.DataFrame.kurtosis,
-                               pd.DataFrame.skew]})
+    if smooth:
+        sample_stats = df_sample.groupby('m/z')\
+            .agg({'abun_scaled_smooth': ['mean', 'median', 'std',
+                                pd.DataFrame.kurtosis,
+                                pd.DataFrame.skew]})
+    else:
+        sample_stats = df_sample.groupby('m/z')\
+            .agg({'abun_scaled': ['mean', 'median', 'std',
+                                pd.DataFrame.kurtosis,
+                                pd.DataFrame.skew]})
     sample_stats = sample_stats.droplevel(level=0, axis=1).reset_index()
     sample_stats['sample_id'] = sample_name
     
@@ -464,7 +470,7 @@ def features_mz_stats(metadata, file_list, detrend_method):
         temp['sample_id'] = sample_name
         
         # Preprocess the sample
-        df_sample = preprocess.preprocess_samples(df_sample, 
+        df_sample = preprocess.preprocess_samples(df_sample,
                                                 detrend_method=detrend_method)
         
         # Statistics
@@ -524,9 +530,8 @@ def get_reference_peak(df_sample):
                       max_peak_ion = ion
                       
     return max_peak_ion
-    
-    
-    
+
+
 def compute_ion_peaks(metadata, 
                       sample_idx, 
                       detrend_method, 
@@ -755,9 +760,9 @@ def range_abun_to_temp(metadata, idx, detrend_method):
 
 
 
-
-
 # ===== DEEP LEARNING =====
+#TODO Add more features and run again
+#TODO Add to the final ensemble - check maybe some of the targets will benefit
 def dl_time_pivot(metadata, n_sample, max_time):
     """
     Process the time series of a sample to create a df
@@ -910,6 +915,8 @@ def slope_time_temp(train_files:dict, metadata, detrend_method):
     return coefs_lr
 
 
+
+
 # ===== CORRELATION WITH MZ4 =====
 
 def corr_mz4(df_sample,
@@ -998,8 +1005,26 @@ def lr_corr_mz4(df_sample,
     return lr_coef
 
 
+
 # ===== TEMPERATURE QUANTILE =====
-   
+
+def tempIQ_mzstats(df_sample,
+                   no_quantiles):
+
+    df_sample['tempIQ'] = pd.qcut(df_sample['temp'],
+                                  q=no_quantiles,
+                                  precision=0)
+    
+    iq_stats = df_sample.groupby(['tempIQ', 'm/z'])\
+                        .agg({'time': ['max', np.ptp],
+                              'temp': ['max', np.ptp],
+                              'abun_scaled': ['mean','max', 'std', 'var', np.ptp]})\
+                        .fillna(0)
+                        
+    return iq_stats
+    
+
+
 def features_temp_qcut(df_all, 
                        split:str='train',
                        no_quantiles:int=10, 
@@ -1252,4 +1277,69 @@ def corr_ions_sig(metadata):
         #print(ions_corr)
         
     return ions_corr
+
+
+# ===== WIDTH =====
+
+def find_roots(x, y):
+    s = np.abs(np.diff(np.sign(y))).astype(bool)
+    return np.round(x[:-1][s] + np.diff(x)[s]/(np.abs(y[1:][s]/y[:-1][s])+1),2)
+
+def plot_peaks_mz(metadata, idx, mz):
+    df_sample = preprocess.get_sample(metadata,idx)
+    df_sample = preprocess.preprocess_samples(df_sample, 
+                                              detrend_method='min')
+
+    # Select the mz ratio and sort values by temperature
+    df_mz = df_sample[df_sample['m/z'] == mz].copy()
+
+    # Apply smoothing to the abundance values
+    df_mz['abun_scaled_smooth'] = gaussian_filter1d(df_mz['abun_scaled'], 
+                                                    sigma=4, 
+                                                    order=0)
+    mz_prominence = df_mz['abun_scaled_smooth'].median()
+    print(f'Prominence: {mz_prominence}')
+    
+    x = df_mz['temp'].values
+    y = df_mz['abun_scaled_smooth'].values
+            
+    peaks, _ = find_peaks(df_mz['abun_scaled_smooth'], 
+                        prominence=mz_prominence)
+    print(f'Peak idx: {peaks}')
+    
+    # Compute only for those mz ratios which have at least
+    # one peak.
+    if len(peaks) > 0:
+        # Get temp values for peaks
+        peaks_temp = []
+        for i in peaks:
+            peaks_temp.append(df_mz.iloc[i]['temp'])
+        print(f'Peak temp: {peaks_temp}')
         
+        # At which MRA should the width be calculated
+        width_loc = [0.25, 0.5, 0.75]
+        peaks_mra_width_loc = {}
+        
+        for n,p in enumerate(peaks): 
+            print(f'Peak {p}')
+            mra_width_loc = []
+            # Value of abundance at peak
+            w = df_mz.iloc[p]['abun_scaled_smooth']
+            
+            # Compute width at three points
+            for i in width_loc:
+                width_point_mra = w*i
+                #mra_width_loc.append(width_point_mra)
+            
+                # Compute roots
+                roots = find_roots(x, y-width_point_mra)            
+                print(i, roots)
+                # Select only roots for the corresponding peak
+                # Each peak should have 2 measurements, this ensures there
+                # are no curves in between the peaks.
+                if len(peaks)*2 == len(roots):
+                    width_range = roots[n:(n+2)]
+                    #mra_width_loc.append(width_range)
+                    peaks_mra_width_loc[p] = width_range
+
+    return peaks_mra_width_loc

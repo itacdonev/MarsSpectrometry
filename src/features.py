@@ -6,6 +6,7 @@ import numpy as np
 from scipy.signal import find_peaks
 from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import spearmanr
+from scipy.interpolate import interp1d
 from sklearn.linear_model import LinearRegression
 from tqdm import tqdm
 from src import config, preprocess, utils
@@ -1317,29 +1318,43 @@ def plot_peaks_mz(metadata, idx, mz):
         print(f'Peak temp: {peaks_temp}')
         
         # At which MRA should the width be calculated
-        width_loc = [0.25, 0.5, 0.75]
+        width_loc = [0.1, 0.5, 0.9]
         peaks_mra_width_loc = {}
+        y_search_peak = {}
+        seq_y = np.arange(2,len(peaks)*2,1)
         
         for n,p in enumerate(peaks): 
-            print(f'Peak {p}')
-            mra_width_loc = []
+            #print(f'Peak {p}')
+            
             # Value of abundance at peak
             w = df_mz.iloc[p]['abun_scaled_smooth']
             
             # Compute width at three points
+            mra_width_loc = {}
+            y_search = {}
             for i in width_loc:
-                width_point_mra = w*i
-                #mra_width_loc.append(width_point_mra)
-            
+                # Y point of search
+                # Need to ensure that the first measure is above 
+                # prominence
+                width_point_mra = ((w-mz_prominence)*i)+mz_prominence
+                y_search[i] = width_point_mra
                 # Compute roots
                 roots = find_roots(x, y-width_point_mra)            
-                print(i, roots)
+                #print(i, roots)
                 # Select only roots for the corresponding peak
                 # Each peak should have 2 measurements, this ensures there
                 # are no curves in between the peaks.
-                if len(peaks)*2 == len(roots):
-                    width_range = roots[n:(n+2)]
-                    #mra_width_loc.append(width_range)
-                    peaks_mra_width_loc[p] = width_range
+                if n == 0: # First two entires for 1st peak
+                    width_range = roots[:2] 
+                else: 
+                    if len(roots) == 2:
+                        width_range = roots
+                    else:
+                        width_range = roots[n+1:n+seq_y[n]]
+                
+                mra_width_loc[i] = width_range
 
-    return peaks_mra_width_loc
+            y_search_peak[p] = y_search
+            peaks_mra_width_loc[p] = mra_width_loc
+
+    return peaks_mra_width_loc, y_search_peak, mz_prominence

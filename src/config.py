@@ -1,7 +1,5 @@
 """Global variables to be used for the project.
 """
-import pandas as pd
-
 # GLOBAL VARIABLES
 DATA_DIR = '../input/'
 DATA_DIR_OUT = '../output/'
@@ -18,3 +16,4 @@ INTENSITY_THRESHOLD = 0.01
 MZ_THRESHOLD = 100
 MZ_CNT_THRESHOLD = 100
 CORRELATION_THRESHOLD = 0.6
+NO_PEAKS_CALC = 4

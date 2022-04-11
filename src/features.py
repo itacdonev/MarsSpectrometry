@@ -8,6 +8,8 @@ from scipy.ndimage.filters import gaussian_filter1d
 from scipy.stats import spearmanr
 from scipy.interpolate import interp1d
 from sklearn.linear_model import LinearRegression
+import matplotlib.pyplot as plt
+import seaborn as sns
 from tqdm import tqdm
 from src import config, preprocess, utils
 
@@ -1286,10 +1288,54 @@ def find_roots(x, y):
     s = np.abs(np.diff(np.sign(y))).astype(bool)
     return np.round(x[:-1][s] + np.diff(x)[s]/(np.abs(y[1:][s]/y[:-1][s])+1),2)
 
-def plot_peaks_mz(metadata, idx, mz):
-    df_sample = preprocess.get_sample(metadata,idx)
-    df_sample = preprocess.preprocess_samples(df_sample, 
-                                              detrend_method='min')
+
+def get_peak_temperature(df_mz, peaks):
+    peak_temp = []
+    for i in peaks:
+        pt = df_mz.iloc[i]["temp"]
+        peak_temp.append(pt)
+    return peak_temp
+
+    
+def get_peak_base(df_mz, peaks, peak_temp):
+    # Number of peaks in mz ratio
+    npeaks = len(peaks)-1
+
+    peak_bases = []
+    for n,_ in enumerate(peaks):
+        #print(n)
+        if n == 0: # First peak
+            dftmp = df_mz[df_mz['temp'] <= peak_temp[n]].copy()
+            dftmp1 = df_mz[(df_mz['temp'] >= peak_temp[n]) &
+                           (df_mz['temp'] <= peak_temp[n+1])].copy()
+            peak_left = dftmp['abun_scaled_smooth'].min()
+            peak_right = dftmp1['abun_scaled_smooth'].min()
+            
+        elif n == npeaks: # Last peak
+            dftmp = df_mz[(df_mz['temp'] >= peak_temp[n-1]) &
+                           (df_mz['temp'] <= peak_temp[n])].copy()
+            dftmp1 = df_mz[df_mz['temp'] >= peak_temp[n]].copy()
+            peak_left = dftmp['abun_scaled_smooth'].min()
+            peak_right = dftmp1['abun_scaled_smooth'].min()
+        
+        else: # In between peaks
+            dftmp = df_mz[(df_mz['temp'] >= peak_temp[n-1]) &
+                           (df_mz['temp'] <= peak_temp[n])].copy()
+            dftmp1 = df_mz[(df_mz['temp'] >= peak_temp[n]) &
+                           (df_mz['temp'] <= peak_temp[n+1])].copy()
+            peak_left = dftmp['abun_scaled_smooth'].min()
+            peak_right = dftmp1['abun_scaled_smooth'].min()
+ 
+        pbase = max(peak_left, peak_right)
+        peak_bases.append(pbase)
+        #print(f'Peak {n+1}: {pbase}')
+    return peak_bases
+
+
+def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
+    
+    # Sample name
+    sample_name = metadata.iloc[idx]['sample_id']
 
     # Select the mz ratio and sort values by temperature
     df_mz = df_sample[df_sample['m/z'] == mz].copy()
@@ -1298,63 +1344,125 @@ def plot_peaks_mz(metadata, idx, mz):
     df_mz['abun_scaled_smooth'] = gaussian_filter1d(df_mz['abun_scaled'], 
                                                     sigma=4, 
                                                     order=0)
+    # Prominence
     mz_prominence = df_mz['abun_scaled_smooth'].median()
-    print(f'Prominence: {mz_prominence}')
+    #print(f'Prominence: {mz_prominence}')
     
     x = df_mz['temp'].values
     y = df_mz['abun_scaled_smooth'].values
             
     peaks, _ = find_peaks(df_mz['abun_scaled_smooth'], 
                         prominence=mz_prominence)
-    print(f'Peak idx: {peaks}')
+    #print(f'Peak idx: {peaks}')
     
+    # Peak temperature
+    peaks_temp = get_peak_temperature(df_mz, peaks)
+    
+    # Get peak bases
+    peak_bases = get_peak_base(df_mz, peaks, peaks_temp)
+
     # Compute only for those mz ratios which have at least
     # one peak.
     if len(peaks) > 0:
-        # Get temp values for peaks
-        peaks_temp = []
-        for i in peaks:
-            peaks_temp.append(df_mz.iloc[i]['temp'])
-        print(f'Peak temp: {peaks_temp}')
-        
         # At which MRA should the width be calculated
         width_loc = [0.1, 0.5, 0.9]
         peaks_mra_width_loc = {}
         y_search_peak = {}
         seq_y = np.arange(2,len(peaks)*2,1)
-        
-        for n,p in enumerate(peaks): 
+
+        for n,p in enumerate(peaks):
             #print(f'Peak {p}')
-            
+
             # Value of abundance at peak
             w = df_mz.iloc[p]['abun_scaled_smooth']
-            
+
+            # Get peak base
+            peak_base = peak_bases[n]
+            print(f'\nPeak {p}, Base: {peak_base}')
+
             # Compute width at three points
             mra_width_loc = {}
             y_search = {}
             for i in width_loc:
                 # Y point of search
-                # Need to ensure that the first measure is above 
+                # Need to ensure that the first measure is above
                 # prominence
-                width_point_mra = ((w-mz_prominence)*i)+mz_prominence
+                width_point_mra = ((w-peak_base)*i)+peak_base
                 y_search[i] = width_point_mra
                 # Compute roots
-                roots = find_roots(x, y-width_point_mra)            
-                #print(i, roots)
+                roots = find_roots(x, y-width_point_mra)
+                print(i, roots)
                 # Select only roots for the corresponding peak
                 # Each peak should have 2 measurements, this ensures there
                 # are no curves in between the peaks.
-                if n == 0: # First two entires for 1st peak
-                    width_range = roots[:2] 
-                else: 
-                    if len(roots) == 2:
-                        width_range = roots
-                    else:
-                        width_range = roots[n+1:n+seq_y[n]]
-                
+                if len(roots) == 2: # Only two roots are given
+                    width_range = roots
+                else: # More than two roots are given
+                    if n == 0: # First two entires for 1st peak
+                        width_range = roots[:2]
+                    elif n == (len(peaks)-1): # Last peak - take laste two roots
+                        width_range = roots[-2:]
+                    else: # In between
+                        if len(roots) == (len(peaks)*2): # two pairs for each peak
+                            width_range = roots[n+1:n+seq_y[n]]
+                        else:
+                            # Check that the base of the current calculation
+                            # is greater than max temp of previous peak
+                            # Then take the 1st two pairs of roots
+                            # Else take the 2nd
+                            if width_point_mra > peaks_temp[n-1]:
+                                width_range = roots[:2]
+                            else:
+                                width_range = roots[2:4]
+                            
                 mra_width_loc[i] = width_range
-
+            print(mra_width_loc)
+                
             y_search_peak[p] = y_search
             peaks_mra_width_loc[p] = mra_width_loc
 
-    return peaks_mra_width_loc, y_search_peak, mz_prominence
+        #print(peaks_mra_width_loc)
+        # ----- Generate a dataframe with features -----
+        # Compute widths
+        widths = {}
+        for peak in peaks_mra_width_loc: # key = peak idx 
+            w = []
+            for i in peaks_mra_width_loc[peak]: # key = 0.1, 0.5, 0.9
+                w.append(np.round(np.ptp(peaks_mra_width_loc[peak][i]),2))
+            widths[peak]= w
+
+        # Create a data frame
+        df_widths = pd.DataFrame.from_dict(widths, orient='index')
+        df_widths = df_widths.reset_index()
+        df_widths.columns = ['peak', 'perc10', 'perc50', 'perc_90']
+        df_widths['peak'] = ['peak_'+str(i) for i in range(len(widths))]
+        df_widths['m/z'] = mz
+        df_widths['m/z'] = ['mz_'+str(i) for i in df_widths['m/z']]
+        df_widths['sample_id'] = sample_name
+        df_widths_pivot = df_widths.pivot(index='sample_id',
+                                    columns=['m/z', 'peak'])
+        
+        df_widths_pivot.columns = df_widths_pivot.columns\
+            .map(lambda x: '_'.join([str(i) for i in x]))
+
+
+        # ----- PLOTS -----
+        if make_plot:
+            plt.subplots(1,1, figsize=(10,6))
+            plt.plot(x, y, label=f'mz ratio {mz}')
+            for peak in peaks_mra_width_loc: # key = peak idx
+                for l in peaks_mra_width_loc[peak]: # key = 0.1, 0.5, 0.9
+                    xw = peaks_mra_width_loc[peak][l].tolist()
+                    yw = [y_search_peak[peak][l] for _ in range(len(xw))]
+                    plt.plot(xw, yw, 'r--')
+            plt.plot([x.min(), x.max()],
+                    [peak_base, peak_base], 
+                    'g-', label='Local peak minima')
+            plt.legend()
+            sns.despine()
+            plt.show()
+        
+    #return peaks_mra_width_loc, y_search_peak, peak_base
+        return df_widths_pivot
+    else:
+        pass

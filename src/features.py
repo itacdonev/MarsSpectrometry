@@ -1304,29 +1304,34 @@ def get_peak_base(df_mz, peaks, peak_temp):
     peak_bases = []
     for n,_ in enumerate(peaks):
         #print(n)
-        if n == 0: # First peak
-            dftmp = df_mz[df_mz['temp'] <= peak_temp[n]].copy()
-            dftmp1 = df_mz[(df_mz['temp'] >= peak_temp[n]) &
-                           (df_mz['temp'] <= peak_temp[n+1])].copy()
-            peak_left = dftmp['abun_scaled_smooth'].min()
-            peak_right = dftmp1['abun_scaled_smooth'].min()
+        # If only one peak:
+        if len(peaks) == 1:
+            pbase = df_mz['abun_scaled_smooth'].median()
+        elif len(peaks) > 1:
+            if n == 0: # First peak
+                dftmp = df_mz[df_mz['temp'] <= peak_temp[n]].copy()
+                dftmp1 = df_mz[(df_mz['temp'] >= peak_temp[n]) &
+                            (df_mz['temp'] <= peak_temp[n+1])].copy()
+                peak_left = dftmp['abun_scaled_smooth'].min()
+                peak_right = dftmp1['abun_scaled_smooth'].min()
+                
+            elif n == (npeaks-1): # Last peak
+                dftmp = df_mz[(df_mz['temp'] >= peak_temp[n-1]) &
+                            (df_mz['temp'] <= peak_temp[n])].copy()
+                dftmp1 = df_mz[df_mz['temp'] >= peak_temp[n]].copy()
+                peak_left = dftmp['abun_scaled_smooth'].min()
+                peak_right = dftmp1['abun_scaled_smooth'].min()
             
-        elif n == npeaks: # Last peak
-            dftmp = df_mz[(df_mz['temp'] >= peak_temp[n-1]) &
-                           (df_mz['temp'] <= peak_temp[n])].copy()
-            dftmp1 = df_mz[df_mz['temp'] >= peak_temp[n]].copy()
-            peak_left = dftmp['abun_scaled_smooth'].min()
-            peak_right = dftmp1['abun_scaled_smooth'].min()
-        
-        else: # In between peaks
-            dftmp = df_mz[(df_mz['temp'] >= peak_temp[n-1]) &
-                           (df_mz['temp'] <= peak_temp[n])].copy()
-            dftmp1 = df_mz[(df_mz['temp'] >= peak_temp[n]) &
-                           (df_mz['temp'] <= peak_temp[n+1])].copy()
-            peak_left = dftmp['abun_scaled_smooth'].min()
-            peak_right = dftmp1['abun_scaled_smooth'].min()
- 
-        pbase = max(peak_left, peak_right)
+            else: # In between peaks
+                dftmp = df_mz[(df_mz['temp'] >= peak_temp[n-1]) &
+                            (df_mz['temp'] <= peak_temp[n])].copy()
+                dftmp1 = df_mz[(df_mz['temp'] >= peak_temp[n]) &
+                            (df_mz['temp'] <= peak_temp[n+1])].copy()
+                peak_left = dftmp['abun_scaled_smooth'].min()
+                peak_right = dftmp1['abun_scaled_smooth'].min()
+            pbase = max(peak_left, peak_right)
+        else:
+            pbase = 0
         peak_bases.append(pbase)
         #print(f'Peak {n+1}: {pbase}')
     return peak_bases
@@ -1378,7 +1383,7 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
 
             # Get peak base
             peak_base = peak_bases[n]
-            print(f'\nPeak {p}, Base: {peak_base}')
+            #print(f'\nPeak {p}, Base: {peak_base}')
 
             # Compute width at three points
             mra_width_loc = {}
@@ -1416,7 +1421,7 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
                                 width_range = roots[2:4]
                             
                 mra_width_loc[i] = width_range
-            print(mra_width_loc)
+            #print(mra_width_loc)
                 
             y_search_peak[p] = y_search
             peaks_mra_width_loc[p] = mra_width_loc

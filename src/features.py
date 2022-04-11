@@ -1318,14 +1318,14 @@ def get_peak_base(df_mz, peaks, peak_temp):
                             (df_mz['temp'] <= peak_temp[n+1])].copy()
                 peak_left = dftmp['abun_scaled_smooth'].min()
                 peak_right = dftmp1['abun_scaled_smooth'].min()
-                print(f'First peak {peak_left}, {peak_right}')
+                #print(f'First peak {peak_left}, {peak_right}')
             elif n == (npeaks): # Last peak
                 dftmp = df_mz[(df_mz['temp'] >= peak_temp[n-1]) &
                             (df_mz['temp'] <= peak_temp[n])].copy()
                 dftmp1 = df_mz[df_mz['temp'] >= peak_temp[n]].copy()
                 peak_left = dftmp['abun_scaled_smooth'].min()
                 peak_right = dftmp1['abun_scaled_smooth'].min()
-                print(f'Last peak {peak_left}, {peak_right}')
+                #print(f'Last peak {peak_left}, {peak_right}')
             else: # In between peaks
                 dftmp = df_mz[(df_mz['temp'] >= peak_temp[n-1]) &
                             (df_mz['temp'] <= peak_temp[n])].copy()
@@ -1333,7 +1333,7 @@ def get_peak_base(df_mz, peaks, peak_temp):
                             (df_mz['temp'] <= peak_temp[n+1])].copy()
                 peak_left = dftmp['abun_scaled_smooth'].min()
                 peak_right = dftmp1['abun_scaled_smooth'].min()
-                print(f'In between: {peak_left}, {peak_right}')
+                #print(f'In between: {peak_left}, {peak_right}')
             pbase = max(peak_left, peak_right)
         else:
             pbase = 0
@@ -1342,7 +1342,12 @@ def get_peak_base(df_mz, peaks, peak_temp):
     return peak_bases
 
 
-def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
+def peak_width_mz(metadata, 
+                  df_sample, 
+                  idx, 
+                  mz,
+                  no_peaks_calc,
+                  make_plot=True):
     
     # Sample name
     sample_name = metadata.iloc[idx]['sample_id']
@@ -1352,8 +1357,8 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
     df_mz = df_mz.reset_index(drop=True)
 
     # Apply smoothing to the abundance values
-    df_mz['abun_scaled_smooth'] = gaussian_filter1d(df_mz['abun_scaled'], 
-                                                    sigma=4, 
+    df_mz['abun_scaled_smooth'] = gaussian_filter1d(df_mz['abun_scaled'],
+                                                    sigma=4,
                                                     order=0)
     # Prominence
     mz_prominence = df_mz['abun_scaled_smooth'].median()
@@ -1364,11 +1369,11 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
             
     peaks, _ = find_peaks(df_mz['abun_scaled_smooth'], 
                         prominence=mz_prominence)
-    #print(f'Peak idx: {peaks}')
+    peaks = peaks[:no_peaks_calc]
     
     # Peak temperature
     peaks_temp = get_peak_temperature(df_mz, peaks)
-    
+
     # Check that the temp at peak n+1 is greater than at n
     # If not delete the n+1 peak
     temp_neg_bool = np.where(np.diff(peaks_temp) < 0)[0]
@@ -1377,6 +1382,7 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
         # Remove temp and peak with the above index
         peaks = np.delete(peaks, idx_temp_neg)
         peaks_temp = np.delete(peaks_temp, idx_temp_neg)
+    #print(f'Peak idx: {peaks}')
 
     # Get peak bases
     peak_bases = get_peak_base(df_mz, peaks, peaks_temp)
@@ -1391,7 +1397,7 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
         seq_y = np.arange(2,len(peaks)*2,1)
 
         for n,p in enumerate(peaks):
-            print(f'Peak {p} Temp {peaks_temp[n]}')
+            #print(f'Peak {p} Temp {peaks_temp[n]}')
 
             # Value of abundance at peak
             w = df_mz.iloc[p]['abun_scaled_smooth']
@@ -1454,10 +1460,11 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
         # Create a data frame
         df_widths = pd.DataFrame.from_dict(widths, orient='index')
         df_widths = df_widths.reset_index()
-        df_widths.columns = ['peak', 'perc10', 'perc50', 'perc_90']
-        df_widths['peak'] = ['peak_'+str(i) for i in range(len(widths))]
+        df_widths.columns = ['peak', 'perc10', 'perc50', 'perc90']
+        df_widths['peak'] = ['peak'+str(i+1) for i in range(len(widths))]
         df_widths['m/z'] = mz
-        df_widths['m/z'] = ['mz_'+str(i) for i in df_widths['m/z']]
+        df_widths['m/z'] = ['mz'+str(i) for i in df_widths['m/z']]
+        df_widths['m/z'] = [i.removesuffix('.0') for i in df_widths['m/z']]
         df_widths['sample_id'] = sample_name
         df_widths_pivot = df_widths.pivot(index='sample_id',
                                     columns=['m/z', 'peak'])
@@ -1475,9 +1482,9 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
                     xw = peaks_mra_width_loc[peak][l].tolist()
                     yw = [y_search_peak[peak][l] for _ in range(len(xw))]
                     plt.plot(xw, yw, 'r--')
-            plt.plot([x.min(), x.max()],
-                    [peak_base, peak_base], 
-                    'g-', label='Local peak minima')
+            # plt.plot([x.min(), x.max()],
+            #         [peak_base, peak_base],
+            #         'g-', label='Local peak minima')
             plt.legend()
             sns.despine()
             plt.show()
@@ -1485,5 +1492,5 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
     #return peaks_mra_width_loc, y_search_peak, peak_base
         return df_widths_pivot
     else:
-        print(f'No peaks in mz {mz} for sample {sample_name}')
+        #print(f'No peaks in mz {mz} for sample {sample_name}')
         df_widths_pivot = pd.DataFrame()

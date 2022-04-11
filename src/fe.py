@@ -487,9 +487,19 @@ class CreateFeatures:
     
     
     # Peak widths
-    def fts_peak_widths(self):
+    def fts_peak_widths(self, no_peaks_calc):
         
-        df_all_samples_width = pd.DataFrame()
+        # Create data frame to store calculation on sample level
+        width_names = ['perc'+str(i) for i in ['10', '50', '90']]
+        mz_names = ['mz' + str(i) for i in range(0,100,1)]
+        peak_names = ['peak'+str(i) for i in range(1,no_peaks_calc+1,1)]
+        column_names = []
+        for w in width_names:
+            for mz in mz_names:
+                for p in peak_names:
+                    column_names.append(w+'_'+mz+'_'+p)
+        df_all_samples_width = pd.DataFrame(columns=column_names)
+        
         # Select one sample
         for idx in tqdm(self.files_dict): #idx
             df_sample = preprocess.get_sample(self.metadata,idx)
@@ -497,16 +507,17 @@ class CreateFeatures:
                                                     detrend_method='min')
             # Get sample name
             sample_name = self.metadata.iloc[idx]['sample_id']
-            print(f'Sample: {sample_name}')
+            #print(f'Sample: {sample_name}')
 
             sample_widths = pd.DataFrame()
             # Compute for each mz ratio
             for mz in df_sample['m/z'].unique().tolist():
-                print(f'MZ: {mz}')
+                #print(f'MZ: {mz}')
                 df_mz_width = features.peak_width_mz(self.metadata,
                                                     df_sample,
                                                     idx,
                                                     mz,
+                                                    no_peaks_calc,
                                                     make_plot=False)
                 # Add one MZ calculation
                 sample_widths = pd.concat([sample_widths, df_mz_width],

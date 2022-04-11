@@ -422,7 +422,7 @@ class CreateFeatures:
         
         
     # Statistics of each mz in the sample: mean, median, std, kurt, skew
-    def fts_mzstats(self):
+    def fts_mzstats(self,):
         """
         Statistics of each mz in the sample: mean, median, std, kurt, skew
         """
@@ -439,10 +439,11 @@ class CreateFeatures:
             
             # Preprocess the sample
             df_sample = preprocess.preprocess_samples(df_sample,
-                                                    detrend_method=self.detrend_method)
+                                                    detrend_method=self.detrend_method,
+                                                    smooth=self.smooth)
             
             # Statistics
-            sample_stats = features.get_mz_stats(df_sample, sample_name)
+            sample_stats = features.get_mz_stats(df_sample, sample_name, self.smooth)
             
             # Fix columns names
             sample_stats['m/z'] = ['mz_'+str(i) for i in sample_stats['m/z']]
@@ -463,7 +464,66 @@ class CreateFeatures:
         return df
 
 
-
+    #TODO Top mz
     def fts_topmz():
         pass
 
+
+
+    # Temp IQ4 stats per mz ratio
+    def fts_tempIQ_mzstats(self):
+        """
+        Divide temperature in each sample into 4 IQ bins and compute stats for all such as:
+            - temp range
+            - area
+            - area - percent to total
+            - number of peaks
+            - max rel abund
+            - variance
+            - std
+            - time range
+        """
+        pass
+    
+    
+    # Peak widths
+    def fts_peak_widths(self):
+        
+        df_all_samples_width = pd.DataFrame()
+        # Select one sample
+        for idx in tqdm(self.files_dict): #idx
+            df_sample = preprocess.get_sample(self.metadata,idx)
+            df_sample = preprocess.preprocess_samples(df_sample, 
+                                                    detrend_method='min')
+            # Get sample name
+            sample_name = self.metadata.iloc[idx]['sample_id']
+
+            sample_widths = pd.DataFrame()
+            # Compute for each mz ratio
+            for mz in df_sample['m/z'].unique().tolist():
+                #print(f'MZ: {mz}')
+                df_mz_width = features.peak_width_mz(self.metadata,
+                                                    df_sample,
+                                                    idx,
+                                                    mz,
+                                                    make_plot=False)
+                # Add one MZ calculation
+                sample_widths = pd.concat([sample_widths, df_mz_width],
+                                          axis=1)
+            #Add one sample calculation
+            if sample_widths.empty:
+                dfempty = pd.DataFrame([[np.nan] * df_all_samples_width.shape[1]],
+                                       columns=df_all_samples_width.columns)
+                dfempty['sample_id'] = sample_name
+                dfempty = dfempty.set_index('sample_id')
+                df_all_samples_width = pd.concat([df_all_samples_width,
+                                                  dfempty],
+                                                 axis=0)
+            else:
+                df_all_samples_width = pd.concat([df_all_samples_width,
+                                                sample_widths],
+                                                axis=0)
+
+        df_all_samples_width = df_all_samples_width.replace(np.nan, 0)
+
+        return df_all_samples_width

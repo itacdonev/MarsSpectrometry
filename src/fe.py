@@ -493,15 +493,16 @@ class CreateFeatures:
         # Select one sample
         for idx in tqdm(self.files_dict): #idx
             df_sample = preprocess.get_sample(self.metadata,idx)
-            df_sample = preprocess.preprocess_samples(df_sample, 
+            df_sample = preprocess.preprocess_samples(df_sample,
                                                     detrend_method='min')
             # Get sample name
             sample_name = self.metadata.iloc[idx]['sample_id']
+            print(f'Sample: {sample_name}')
 
             sample_widths = pd.DataFrame()
             # Compute for each mz ratio
             for mz in df_sample['m/z'].unique().tolist():
-                #print(f'MZ: {mz}')
+                print(f'MZ: {mz}')
                 df_mz_width = features.peak_width_mz(self.metadata,
                                                     df_sample,
                                                     idx,

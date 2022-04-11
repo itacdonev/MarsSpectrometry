@@ -1315,7 +1315,7 @@ def get_peak_base(df_mz, peaks, peak_temp):
                 peak_left = dftmp['abun_scaled_smooth'].min()
                 peak_right = dftmp1['abun_scaled_smooth'].min()
                 
-            elif n == (npeaks-1): # Last peak
+            elif n == npeaks: # Last peak
                 dftmp = df_mz[(df_mz['temp'] >= peak_temp[n-1]) &
                             (df_mz['temp'] <= peak_temp[n])].copy()
                 dftmp1 = df_mz[df_mz['temp'] >= peak_temp[n]].copy()
@@ -1396,7 +1396,7 @@ def peak_width_mz(metadata, df_sample, idx, mz, make_plot=True):
                 y_search[i] = width_point_mra
                 # Compute roots
                 roots = find_roots(x, y-width_point_mra)
-                print(i, roots)
+                #print(i, roots)
                 # Select only roots for the corresponding peak
                 # Each peak should have 2 measurements, this ensures there
                 # are no curves in between the peaks.

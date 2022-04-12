@@ -4,6 +4,7 @@
 DATA_DIR = '../input/'
 DATA_DIR_OUT = '../output/'
 MODELS_DIR = '../models/'
+CLF_DIR = '../models/clf'
 RANDOM_SEED = 42
 NO_CV_FOLDS = 10
 LEARNING_RATE = 0.01

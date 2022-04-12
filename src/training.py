@@ -80,6 +80,7 @@ def trainCV_label(X,
                   cv_folds:str,
                   model_metric,
                   model_algo,
+                  base_model_name:bool=False,
                   verbose:bool=False,
                   target_encode:bool=False,
                   target_encode_fts:list=None,
@@ -105,31 +106,41 @@ def trainCV_label(X,
             List of target columns
             
         cv_folds: int
-            Number of CV folds to split the sample.            
+            Number of CV folds to split the sample.
         
         model_metric
             Define model metric to be used for training.
-            
-        clf
-            Classifier for training
-            
+
+        base_model_name (str): Name of the base model.
+                Example: 'fts_mra_tempmz_XGB_opt_tr'
+
         verbose: bool (default=False)
             If True it prints results for each fold.
 
     Returns
     -------
-    
+
     """
 
     # Get label names
     label_names = df_y[target]
+
+    # Get CV loss of the base model for comparison
+    if base_model_name:
+        cv_base_model = pd.read_csv(os.path.join(config.MODELS_DIR,
+                                                 base_model_name +
+                                                 '_cvloss.csv'), index_col='target')
+        cv_base_model = cv_base_model.to_dict()[cv_base_model.columns[0]]
 
     # MODEL INFORMATION
     logloss = {}    # Average value of log loss for each label
 
     # TRAIN EACH LABEL SEPARATELY
     for label in label_names:
-        print(colored(f'{label}', 'yellow'))
+
+        if not base_model_name:
+            print(colored(f'{label}', 'yellow'))
+
         # Select one label
         y = df_y[label].copy()
 
@@ -226,7 +237,18 @@ def trainCV_label(X,
 
         # Average log loss per label
         logloss[label] = np.sum(oof_logloss)/cv_folds
-        
+
+        if base_model_name:
+            ll_diff_to_base = logloss[label] - cv_base_model[label]
+            if ll_diff_to_base < 0:
+                print(colored(f'{label}', 'yellow'),
+                    colored(f'- LogLoss decreased by {ll_diff_to_base}', 'green'))
+            else:
+                print(colored(f'{label}', 'yellow'),
+                    colored(f'- LogLoss increased by {ll_diff_to_base}', 'red'))
+        else:
+            print(colored(f'LogLoss {logloss[label]}', 'yellow'))
+
     if verbose:
         print(f'Average Log Loss: {np.mean(list(logloss.values()))}')
         print(logloss)
@@ -370,7 +392,7 @@ def train_full_model(X,
         # ===== FIT THE MODEL FOR LABEL =====
         #print('Fit the model')
         #clf_fitted_dict[label] = clf.fit(Xtrain, y)
-        print(colored(f'{label} - nfeatures: {len(Xtrain.columns)}', 'yellow'))
+        print(colored(f'{label} - nfeatures: {len(Xtrain.columns)}', 'green'))
         clf.fit(Xtrain, y)
             
         # Feature importance plots
@@ -385,10 +407,10 @@ def train_full_model(X,
 
         # save model to file
         if fts_select_cols:
-            joblib.dump(clf, os.path.join(config.MODELS_DIR,
+            joblib.dump(clf, os.path.join(config.CLF_DIR,
                                         sub_name + '_sfm_' + label + ".joblib.dat"))
         else:
-            joblib.dump(clf, os.path.join(config.MODELS_DIR,
+            joblib.dump(clf, os.path.join(config.CLF_DIR,
                                         sub_name + '_' + label + ".joblib.dat"))
 
         # Make predictions
@@ -409,6 +431,7 @@ def train_tbl(df_train, df_labels,
               model_algo,
               sub_name:str,
               split_type:str,
+              base_model_name:str=None,
               target_encode:bool=None,
               target_encode_fts:list=None,
               verbose:bool=False,
@@ -440,6 +463,7 @@ def train_tbl(df_train, df_labels,
                                   cv_folds=config.NO_CV_FOLDS,
                                   model_metric=log_loss,
                                   model_algo=model_algo,
+                                  base_model_name=base_model_name,
                                   target_encode=target_encode,
                                   verbose=verbose,
                                   target_encode_fts=target_encode_fts,
@@ -480,8 +504,8 @@ def train_tbl(df_train, df_labels,
         submission.to_csv(config.MODELS_DIR + sub_name + '.csv')
 
     print(colored(f'CV LogLoss: {np.round(np.mean(list(train_cv_loss.values())), 5)}', 'yellow'))
-    print('Log Loss per Label:')
-    print(train_cv_loss)
+    #print('Log Loss per Label:')
+    #print(train_cv_loss)
 
     return train_cv_loss, submission
 
@@ -498,7 +522,7 @@ def compute_valid_loss(submission_file_VT,
     Predictions are computed on the VALID data set.
     """
     df_sub = submission_file_VT.iloc[:len(valid_files),:]
-    print(df_sub.shape)
+    #print(df_sub.shape)
     
     model_ll = {}
     for label in target_label_list:

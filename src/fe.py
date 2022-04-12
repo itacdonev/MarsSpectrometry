@@ -538,4 +538,9 @@ class CreateFeatures:
 
         df_all_samples_width = df_all_samples_width.replace(np.nan, 0)
 
+        # Save feature data frame
+        df_all_samples_width.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                    self.fts_name + '_' + self.file_suffix + '.csv'),
+                         index=False)
+        
         return df_all_samples_width

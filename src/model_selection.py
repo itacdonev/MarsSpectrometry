@@ -39,10 +39,10 @@ models = {
                                  eval_metric = 'logloss',
                                  learning_rate = 0.09),
     
-    'XGB_opt': Pipeline([('XGB_opt', xgb.XGBClassifier(objective = "binary:logistic",
+    'XGB_opt': xgb.XGBClassifier(objective = "binary:logistic",
                                  use_label_encoder = False,
                                  eval_metric = 'logloss',
-                                 learning_rate = 0.09))]),
+                                 learning_rate = 0.09),
         
     'XGB_hp': xgb.XGBClassifier(objective = "binary:logistic",
                                 use_label_encoder = False,

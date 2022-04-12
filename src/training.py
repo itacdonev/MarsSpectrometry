@@ -2,11 +2,15 @@
 Training functions including cross validation and full
 model training.
 """
-import os
+from src import config, features, feature_selection, model_selection
+import os, json, joblib
 from collections import Counter
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
+from termcolor import colored
 import numpy as np
 import pandas as pd
-from termcolor import colored
+
 from sklearn.model_selection import StratifiedKFold
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import log_loss
@@ -14,13 +18,12 @@ from sklearn.decomposition import PCA
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.pipeline import Pipeline
 from sklearn import svm
-import joblib
 import lightgbm as lgb
 import xgboost as xgb
 from xgboost import plot_importance
+from tqdm import tqdm
 #from xgboost import plot_tree
 import matplotlib.pyplot as plt
-from src import config, features, model_selection
 
 def define_cvfolds(df, no_folds, SEED:int, 
                    group:str=None, strata:str=None):
@@ -71,20 +74,22 @@ def define_cvfolds(df, no_folds, SEED:int,
     return df
 
 
-def trainCV_label(X, df_y, 
-                  target:list, 
+def trainCV_label(X,
+                  df_y,
+                  target:list,
                   cv_folds:str,
                   model_metric,
-                  model_algo, 
+                  model_algo,
                   verbose:bool=False,
                   target_encode:bool=False,
                   target_encode_fts:list=None,
-                  fts_select_cols:dict=None):
+                  fts_select_cols:dict=None,
+                  early_stopping:bool=False):
     """
     Training pipeline 
         - tabular one target label at a time
         - SKF for each label target
-    
+
     Parameters
     ----------
         X: pandas data frame
@@ -110,36 +115,32 @@ def trainCV_label(X, df_y,
             
         verbose: bool (default=False)
             If True it prints results for each fold.
-            
+
     Returns
     -------
-        
-            
-    """
     
+    """
+
     # Get label names
     label_names = df_y[target]
-    
+
     # MODEL INFORMATION
     logloss = {}    # Average value of log loss for each label
-    
+
     # TRAIN EACH LABEL SEPARATELY
-    for label in label_names: 
-        print(colored(label, 'magenta'))
-        if verbose:
-            print(colored(f'\nLABEL: {label}', 'blue'))
-        
-        # Select one label   
+    for label in label_names:
+        print(colored(f'{label}', 'yellow'))
+        # Select one label
         y = df_y[label].copy()
-        
+
         # Define cross validation
         cv = StratifiedKFold(n_splits = cv_folds,
                              random_state =config.RANDOM_SEED,
                              shuffle = True)
-        
+
         # CROSS VALIDATION TRAINING
         oof_logloss = [] # Metric for each fold for one label
-        
+
         # Define the folds and train the model
         for fold, (t_, v_) in enumerate(cv.split(X, y)):
             #print(colored(f'FOLD {fold+1}', 'magenta'))
@@ -193,7 +194,7 @@ def trainCV_label(X, df_y,
                 Xtrain = X_train.copy()
                 Xvalid = X_valid.copy()
 
-            # ----- Feature selection ----- 
+            # ----- Feature selection -----
             if fts_select_cols:
                 fts_columns = fts_select_cols[label]
                 Xtrain = Xtrain[fts_columns].copy()
@@ -205,9 +206,17 @@ def trainCV_label(X, df_y,
                 clf.set_params(scale_pos_weight=estimate)
             else:
                 clf = model_selection.models[model_algo]
-            
+
+            #print(f'Shape X: {Xtrain.shape[0]}')
             # Train a model
-            clf.fit(Xtrain, y_train)
+            if early_stopping:
+                clf.fit(Xtrain, y_train,
+                        early_stopping_rounds=10,
+                        eval_metric="logloss",
+                        eval_set=[(X_valid, y_valid)],
+                        verbose=False)
+            else:
+                clf.fit(Xtrain, y_train)
 
             # Compute predictions
             y_preds = clf.predict_proba(Xvalid)[:,1]
@@ -217,7 +226,7 @@ def trainCV_label(X, df_y,
 
         # Average log loss per label
         logloss[label] = np.sum(oof_logloss)/cv_folds
-
+        
     if verbose:
         print(f'Average Log Loss: {np.mean(list(logloss.values()))}')
         print(logloss)
@@ -231,10 +240,12 @@ def train_full_model(X,
                      Xte,
                      sub_name,
                      model_algo:str,
+                     split_type:str,
                      target_encode:bool=None,
                      target_encode_fts:list=None,
                      test_sam:bool=False,
-                     fts_select_cols:dict=None
+                     fts_select_cols:dict=None,
+                     show_fi_plots:bool=False
                      ):
     """
     Train full model
@@ -243,7 +254,7 @@ def train_full_model(X,
     """
     
     # Read in the submission file
-    submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv', 
+    submission = pd.read_csv(config.DATA_DIR + 'submission_format.csv',
                             index_col='sample_id')
     
     if test_sam:
@@ -255,11 +266,14 @@ def train_full_model(X,
     label_names = df_y[target]
     #clf_fitted_dict = {}              # fitted classifiers
     #df_te_fitted = pd.DataFrame()     # target encoding
-
+    
+    # To save the feature names for each label for the full model
+    # without any selection
+    feature_names_dict = {}
     for label in label_names:
 
         # Select one label
-        print(colored(f'LABEL: {label}', 'blue'))
+        #print(colored(f'{label}', 'yellow'))
         y = df_y[label].copy().values
 
         # estimate scale_pos_weight value for XGB
@@ -303,6 +317,9 @@ def train_full_model(X,
             fts_columns = fts_select_cols[label]
             Xtrain = Xtrain[fts_columns].copy()
             Xtest = Xtest[fts_columns].copy()
+        
+        # Add features
+        feature_names_dict[label] = Xtrain.columns.tolist()
             
         # ----- MODEL SELECTION -----
         if model_algo == 'LR_reg':
@@ -353,21 +370,23 @@ def train_full_model(X,
         # ===== FIT THE MODEL FOR LABEL =====
         #print('Fit the model')
         #clf_fitted_dict[label] = clf.fit(Xtrain, y)
+        print(colored(f'{label} - nfeatures: {len(Xtrain.columns)}', 'yellow'))
         clf.fit(Xtrain, y)
             
         # Feature importance plots
         if model_algo in ['XGB', 'XGB_opt', 'XGB_imb', 'XGB_hp', 'XGB_sfm']:
-            _,ax = plt.subplots(1,1,figsize=(10,10))
-            plot_importance(clf, max_num_features=30, height=0.5,
-                            importance_type='gain', ax=ax)
-            plt.show()
-            #TODO install graphviz to plot tree
-            #plot_tree(clf, num_trees=6)
+            if show_fi_plots:
+                _,ax = plt.subplots(1,1,figsize=(10,5))
+                plot_importance(clf, max_num_features=15, height=0.5,
+                                importance_type='gain', ax=ax)
+                plt.show()
+                #TODO install graphviz to plot tree
+                #plot_tree(clf, num_trees=6)
 
         # save model to file
         if fts_select_cols:
             joblib.dump(clf, os.path.join(config.MODELS_DIR,
-                                        sub_name + '_sfm_' + label + ".joblib.dat"))    
+                                        sub_name + '_sfm_' + label + ".joblib.dat"))
         else:
             joblib.dump(clf, os.path.join(config.MODELS_DIR,
                                         sub_name + '_' + label + ".joblib.dat"))
@@ -375,6 +394,12 @@ def train_full_model(X,
         # Make predictions
         submission[label] = clf.predict_proba(Xtest)[:,1]
 
+    # Save feature names of the trained model
+    file_name = sub_name + '_COLS.txt'
+    with open(file_name, 'w') as file:
+        file.write(json.dumps(feature_names_dict))
+    print(f'Saving {file_name}')
+    
     return submission
 
 
@@ -383,11 +408,13 @@ def train_tbl(df_train, df_labels,
               df_test,
               model_algo,
               sub_name:str,
+              split_type:str,
               target_encode:bool=None,
               target_encode_fts:list=None,
               verbose:bool=False,
               test_sam:bool=False,
-              fts_select_cols:dict=None):
+              fts_select_cols:dict=None,
+              early_stopping:bool=False):
     """
     Train tabular data. The training is done on CV and full dataset.
 
@@ -404,19 +431,20 @@ def train_tbl(df_train, df_labels,
     if not isinstance(df_test, pd.DataFrame):
         df_test = pd.read_csv(os.path.join(config.DATA_DIR_OUT +
                                             df_test + '.csv'))
-        
+
     # CV TRAINING
     print(colored('CV training ....', 'blue'))
     train_cv_loss = trainCV_label(X=df_train,
                                   df_y=df_labels,
-                                  target=target_list, 
+                                  target=target_list,
                                   cv_folds=config.NO_CV_FOLDS,
                                   model_metric=log_loss,
                                   model_algo=model_algo,
                                   target_encode=target_encode,
                                   verbose=verbose,
                                   target_encode_fts=target_encode_fts,
-                                  fts_select_cols=fts_select_cols)
+                                  fts_select_cols=fts_select_cols,
+                                  early_stopping=early_stopping)
     
     train_cv_loss_df = pd.DataFrame.from_dict(train_cv_loss, orient='index')
     if fts_select_cols:
@@ -439,21 +467,22 @@ def train_tbl(df_train, df_labels,
                                   sub_name=sub_name,
                                   target=target_list,
                                   model_algo=model_algo,
+                                  split_type=split_type,
                                   target_encode=target_encode,
                                   target_encode_fts=target_encode_fts,
                                   test_sam=test_sam,
                                   fts_select_cols=fts_select_cols)
-    
+
     # Save submission file
     if fts_select_cols:
         submission.to_csv(config.MODELS_DIR + sub_name + '_sfm.csv')
     else:
         submission.to_csv(config.MODELS_DIR + sub_name + '.csv')
-    
-    print(colored(f'\nAverage Log Loss: {np.round(np.mean(list(train_cv_loss.values())), 4)}', 'blue'))
+
+    print(colored(f'CV LogLoss: {np.round(np.mean(list(train_cv_loss.values())), 5)}', 'yellow'))
     print('Log Loss per Label:')
     print(train_cv_loss)
-    
+
     return train_cv_loss, submission
 
 
@@ -462,7 +491,7 @@ def compute_valid_loss(submission_file_VT,
                        valid_labels, 
                        target_label_list,
                        sub_name:str,
-                       fts_select_cols:bool=False):
+                       fts_select_cols:str=None):
     """
     Compute validation loss.
     Model is trained only on TRAIN data set.

@@ -417,10 +417,11 @@ def train_full_model(X,
         submission[label] = clf.predict_proba(Xtest)[:,1]
 
     # Save feature names of the trained model
-    file_name = sub_name + '_COLS.txt'
-    with open(file_name, 'w') as file:
-        file.write(json.dumps(feature_names_dict))
-    print(f'Saving {file_name}')
+    if not fts_select_cols:
+        file_name = sub_name + '_COLS.txt'
+        with open(file_name, 'w') as file:
+            file.write(json.dumps(feature_names_dict))
+        print(f'Saving {file_name}')
     
     return submission
 

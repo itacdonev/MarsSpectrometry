@@ -7,6 +7,8 @@ from tqdm import tqdm
 from termcolor import colored
 import pandas as pd
 import numpy as np
+import warnings
+warnings.simplefilter(action='ignore', category=UserWarning)
 from sklearn.feature_selection import SelectFromModel
 from sklearn.metrics import log_loss
 from src import config, model_selection
@@ -73,7 +75,9 @@ class SelectModelFeatures():
 
     def load_features(self):
         print(colored(f'Loading feature column names', 'blue'))
-        path_cols = self.base_sfm_features_name + '_' + self.split_type + '_SFM_COLS.txt'
+        path_cols = self.base_sfm_features_name + '_' +\
+                    self.fitted_model_algo + '_' +\
+                    self.split_type + '_SFM_COLS.txt'
         print(f'Reading {path_cols}')
         with open(path_cols) as json_file:
                 new_features_dict = json.load(json_file)
@@ -110,7 +114,7 @@ class SelectModelFeatures():
         Threshold value for feature importance for each label.
         Thresholds are saved with '_sfmt.csv' suffix.
         """
-
+        print('Computing optimal threshold for each label')
         thrs_value = {}
         for label in tqdm(self.target_labels_list):
             #print(colored(f'LABEL: {label}', 'blue'))
@@ -119,7 +123,7 @@ class SelectModelFeatures():
             MODEL_CLF = self.fitted_model_name + '_' + self.split_type + '_' + label + '.joblib.dat'
 
             # Load saved model and compute thresholds
-            clf = joblib.load(os.path.join(config.MODELS_DIR, MODEL_CLF))
+            clf = joblib.load(os.path.join(config.CLF_DIR, MODEL_CLF))
             fi_min = clf.feature_importances_.min()
             fi_max = clf.feature_importances_.max()
             threshold = np.arange(fi_min, fi_max, 0.001)
@@ -168,15 +172,16 @@ class SelectModelFeatures():
         The dictionary is saved with extension '_SFM_COLS.txt'.
         Example : 'fts_mra_tempmz_sfm_tr_SFM_COLS.txt'
         """
-
+        
+        print('Refinting the model based on the threshold')
         sfm_loss = {}
         new_features_dict = {}
-        for label in tqdm(self.target_labels_list):
+        for label in self.target_labels_list:
             print(colored(f'LABEL: {label}', 'blue'))
 
             # Load saved model
             MODEL_CLF = self.fitted_model_name + '_' + self.split_type + '_' + label + '.joblib.dat'
-            clf = joblib.load(os.path.join(config.MODELS_DIR, MODEL_CLF))
+            clf = joblib.load(os.path.join(config.CLF_DIR, MODEL_CLF))
             
             selection = SelectFromModel(clf, threshold=thrs_value[label], prefit=True)
             X_tr_sfm = selection.transform(self.X_tr)
@@ -192,7 +197,7 @@ class SelectModelFeatures():
             select_X_test = selection.transform(self.X_vlte.iloc[:len(self.valid_files),:])
             y_pred = clf_sfm.predict_proba(select_X_test)[:,1]
             label_loss = log_loss(self.valid_labels[label], y_pred, labels=(0,1))
-            print(f'N={X_tr_sfm.shape[1]}, log-loss: {label_loss}')
+            #print(f'N={X_tr_sfm.shape[1]}, log-loss: {label_loss}')
             sfm_loss[label] = label_loss
 
         file_path = self.fitted_model_name + '_' + self.split_type + '_SFM_COLS.txt'

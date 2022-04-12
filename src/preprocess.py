@@ -84,8 +84,7 @@ def remove_small_cnt_mz(df_sample, remove_mz_thrs):
         
     return df_sample
 
-         
-    
+
 def remove_bcg_abund(df):
     """
     Subtracts minimum abundance value

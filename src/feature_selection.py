@@ -364,13 +364,13 @@ class SelectModelFeatures():
 
                 # More than 1 feature was added - recompute using optimal threshold
                 else:
-                    print(f'Recomputing current model features from fitted model (no fts > 1) {self.fitted_model_name}')
+                    print(f'Recomputing current model features from fitted model (no fts > 1) {self.fitted_model_name+"_"+self.split_type}')
                     thrs_value = self.optimal_threshold_fi()
                     _, sfm_columns = self.select_threshold_columns(thrs_value)
 
             # Recomputing current model features
             else:
-                print(f'Recomputing current model features from fitted model {self.fitted_model_name}')
+                print(f'Recomputing current model features from fitted model {self.fitted_model_name+"_"+self.split_type}')
                 thrs_value = self.optimal_threshold_fi()
                 _, sfm_columns = self.select_threshold_columns(thrs_value)
 

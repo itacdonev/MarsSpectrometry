@@ -209,7 +209,8 @@ class SelectModelFeatures():
         df_thrs.index = df_thrs.index.set_names('target')
 
         # Save the computed thresholds
-        df_thrs.to_csv(os.path.join(config.MODELS_DIR, self.fitted_model_name + '_sfmt.csv'),
+        df_thrs.to_csv(os.path.join(config.MODELS_DIR, self.fitted_model_name + '_' +
+                                    self.split_type + '_sfmt.csv'),
                                     index=True)
 
         return thrs_value

@@ -117,11 +117,21 @@ class SelectModelFeatures():
         """
         print('Computing optimal threshold for each label')
         thrs_value = {}
-        for label in tqdm(self.target_labels_list):
-            #print(colored(f'LABEL: {label}', 'blue'))
-
+        for label in self.target_labels_list:
             # Get the full model name
-            MODEL_CLF = self.fitted_model_name + '_' + self.split_type + '_' + label + '.joblib.dat'
+            if self.base_fitted_model_name:
+                MODEL_CLF = self.fitted_model_name + '_' + self.split_type + '_' + 'sfm_' + label + '.joblib.dat'
+                MODEL_CLF_COLS = self.fitted_model_name + '_' + self.split_type + '_COLS_sfm.txt'
+            else:
+                MODEL_CLF = self.fitted_model_name + '_' + self.split_type + '_' + label + '.joblib.dat'
+                MODEL_CLF_COLS = self.fitted_model_name + '_' + self.split_type + '_COLS.txt'
+            print(f'{label} - Computing threshold on {MODEL_CLF}')
+
+            # Load features from the fitted model
+            with open(MODEL_CLF_COLS) as json_file:
+                fitted_fts = json.load(json_file)
+            X_tr_fit = self.X_tr[fitted_fts[label]].copy()
+            X_vlte_fit = self.X_vlte[fitted_fts[label]].copy()
 
             # Load saved model and compute thresholds
             clf = joblib.load(os.path.join(config.CLF_DIR, MODEL_CLF))
@@ -134,16 +144,16 @@ class SelectModelFeatures():
 
             for thrs in threshold:
                 selection = SelectFromModel(clf, threshold=thrs, prefit=True)
-                selection_fts = selection.get_support()
-                X_tr_sfm_cols = self.X_tr.columns[selection_fts]
-                X_tr_sfm = self.X_tr[X_tr_sfm_cols].copy()
-                #X_tr_sfm = selection.transform(self.X_tr)
+                #selection_fts = selection.get_support()
+                #X_tr_sfm_cols = self.X_tr.columns[selection_fts]
+                #X_tr_sfm = self.X_tr[X_tr_sfm_cols].copy()
+                X_tr_sfm = selection.transform(X_tr_fit)
                 # train model
                 clf_sfm = model_selection.models[self.fitted_model_algo]
                 clf_sfm.fit(X_tr_sfm, self.train_labels[label])
 
                 # Evaluate model
-                select_X_test = selection.transform(self.X_vlte.iloc[:len(self.valid_files),:])
+                select_X_test = selection.transform(X_vlte_fit.iloc[:len(self.valid_files),:])
                 y_pred = clf_sfm.predict_proba(select_X_test)[:,1]
                 thrs_loss = log_loss(self.valid_labels[label], y_pred, labels=(0,1))
                 #print(f'Threshold={thrs}, n={X_tr_sfm.shape[0]}, log-loss: {thrs_loss}')
@@ -151,6 +161,7 @@ class SelectModelFeatures():
                     thrs_loss_best = thrs_loss
                     thrs_best = thrs
             thrs_value[label] = thrs_best
+            print(f'Threshold {thrs_best}')
 
         df_thrs = pd.DataFrame.from_dict(thrs_value, orient='index')
         df_thrs.columns = [self.fitted_model_name]
@@ -177,15 +188,27 @@ class SelectModelFeatures():
         print('Refinting the model based on the threshold')
         sfm_loss = {}
         new_features_dict = {}
-        for label in tqdm(self.target_labels_list):
+        for label in self.target_labels_list:
             #print(colored(f'LABEL: {label}', 'blue'))
 
             # Load saved model
-            MODEL_CLF = self.fitted_model_name + '_' + self.split_type + '_' + label + '.joblib.dat'
+            if self.base_fitted_model_name:
+                MODEL_CLF = self.fitted_model_name + '_' + self.split_type + '_' + 'sfm_' + label + '.joblib.dat'
+                MODEL_CLF_COLS = self.fitted_model_name + '_' + self.split_type + '_COLS_sfm.txt'
+            else:
+                MODEL_CLF = self.fitted_model_name + '_' + self.split_type + '_' + label + '.joblib.dat'
+                MODEL_CLF_COLS = self.fitted_model_name + '_' + self.split_type + '_COLS.txt'
+
             clf = joblib.load(os.path.join(config.CLF_DIR, MODEL_CLF))
+
+            # Load features from the fitted model
+            with open(MODEL_CLF_COLS) as json_file:
+                fitted_fts = json.load(json_file)
+            X_tr_fit = self.X_tr[fitted_fts[label]].copy()
+            X_vlte_fit = self.X_vlte[fitted_fts[label]].copy()
             
             selection = SelectFromModel(clf, threshold=thrs_value[label], prefit=True)
-            X_tr_sfm = selection.transform(self.X_tr)
+            X_tr_sfm = selection.transform(X_tr_fit)
             # Save features for each label
             sfm_idx = selection.get_support(indices=True)
             new_features_dict[label] = [self.X_tr.columns[i] for i in sfm_idx]
@@ -195,7 +218,7 @@ class SelectModelFeatures():
             clf_sfm.fit(X_tr_sfm, self.train_labels[label])
 
             # Evaluate model
-            select_X_test = selection.transform(self.X_vlte.iloc[:len(self.valid_files),:])
+            select_X_test = selection.transform(X_vlte_fit.iloc[:len(self.valid_files),:])
             y_pred = clf_sfm.predict_proba(select_X_test)[:,1]
             label_loss = log_loss(self.valid_labels[label], y_pred, labels=(0,1))
             #print(f'N={X_tr_sfm.shape[1]}, log-loss: {label_loss}')
@@ -258,7 +281,7 @@ class SelectModelFeatures():
                                               self.split_type + '.csv'))
                 new_model_cols = dt.columns
                 print(f'New features from {self.new_features_file_name + "_" + self.split_type + ".csv"}')
-                
+
                 # Only 1 new feature was added - check CV loss difference
                 if len(new_model_cols) == 1:
                     print(f'Detected 1 new feature')

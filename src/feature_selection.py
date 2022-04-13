@@ -202,7 +202,7 @@ class SelectModelFeatures():
                     thrs_loss_best = thrs_loss
                     thrs_best = thrs
             thrs_value[label] = thrs_best
-            print(f'Threshold {thrs_best}')
+            #print(f'Threshold {thrs_best}')
 
         df_thrs = pd.DataFrame.from_dict(thrs_value, orient='index')
         df_thrs.columns = [self.fitted_model_name]

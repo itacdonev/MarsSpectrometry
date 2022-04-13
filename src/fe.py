@@ -464,9 +464,77 @@ class CreateFeatures:
         return df
 
 
-    #TODO Top mz
-    def fts_topmz():
-        pass
+    # TopN mz ratios
+    def fts_topmz(self,
+                  N_values:int=3,
+                  normalize:bool=True,
+                  lb:float=0.0, ub:float=0.99):
+        """
+        Compute top N ions by their max relativeabundance.
+
+        Parameters
+        ----------
+        N: int (default=3)
+                Number of top ions to store
+
+            normalize: str (default=True)
+                Should the values be normalized
+                
+            up: float (default=0.99)
+                Upper bound of feature range.
+            
+            lb: float (default=0.0)
+                Lower bound of feature range.
+                
+        Returns
+        -------
+            dictionary of sample and a list of top N ions
+        """
+        
+        top3_ions = {} # sample, list of top 3 ions - {'S0000',[18.0, 9.0, 25.0]}
+        
+        # Compute for each sample in metadata
+        for i in tqdm(self.files_dict):
+            # Get and preprocess data sample
+            df_sample = preprocess.get_sample(self.metadata, i)
+            df_sample = preprocess.preprocess_samples(df_sample,
+                                                      detrend_method=self.detrend_method,
+                                                      smooth=self.smooth)
+            sample_name = self.metadata.iloc[i]['sample_id']
+
+            # Compute top 3 ions by relative abundance
+            # Take max of each ion group sort and slice top N
+            top3 = list((df_sample.groupby('m/z')['abun_scaled']\
+                            .agg('max')\
+                            .sort_values(ascending=False))\
+                                .head(N_values).index)
+
+            top3_ions[sample_name] = top3
+
+        # Convert to data frame
+        temp = pd.DataFrame.from_dict(top3_ions, orient='index')
+        # Rename columns
+        temp.columns = ['top_%s' % (i+1) for i in range(N_values)]
+
+        # Normalize values
+        if normalize:
+            # Compute min,max for all columns
+            minv = (temp.min()).min()
+            maxv = (temp.max()).max()
+            for col in temp:
+                col_std = (temp[col] - minv) / (maxv - minv)
+                temp[col] = col_std * (ub - lb) + lb
+
+        # Fix the index
+        #temp.index = temp.index.set_names('sample_id')
+        #temp = temp.reset_index()
+
+        # Save feature data frame
+        temp.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                    self.fts_name + '_' + self.file_suffix + '.csv'),
+                         index=False)
+
+        return temp
 
 
 

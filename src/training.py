@@ -127,11 +127,12 @@ def trainCV_label(X,
 
     # Get CV loss of the base model for comparison
     if base_model_name:
-        cv_base_model = pd.read_csv(os.path.join(config.MODELS_DIR,
-                                                 base_model_name +
-                                                 '_cvloss.csv'), index_col='target')
+        file_path = os.path.join(config.MODELS_DIR, base_model_name + '_cvloss.csv')
+        cv_base_model = pd.read_csv(file_path, 
+                                    index_col='target')
         cv_base_model = cv_base_model.to_dict()[cv_base_model.columns[0]]
-
+        print(f'Basel model CVloss: {file_path}')
+        
     # MODEL INFORMATION
     logloss = {}    # Average value of log loss for each label
 

@@ -117,19 +117,11 @@ class SelectModelFeatures():
         print(f'Saving {file_name}')
 
 
-    def load_features(self):
+    def load_features(self, file_name):
         print(colored(f'Loading feature column names', 'blue'))
         # Load features from the base model
-        try:
-            path_cols = self.base_sfm_features_name + '_' +\
-                        self.fitted_model_algo + '_' +\
-                        self.split_type + '_SFM_COLS.txt'
-        except:
-            print(f'No file {path_cols}')
-        else:
-            path_cols = self.base_sfm_features_name + '_' +\
-                        self.fitted_model_algo + '_' +\
-                        self.split_type + '_COLS_sfm.txt'
+        path_cols = file_name + '_' + self.fitted_model_algo + '_' + self.split_type + '_SFM_COLS.txt'
+        
         print(f'Reading {path_cols}')
         with open(path_cols) as json_file:
                 new_features_dict = json.load(json_file)

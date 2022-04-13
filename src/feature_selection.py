@@ -24,6 +24,7 @@ class SelectModelFeatures():
     ---------
     base_sfm_features_name (str): features file name of the input SFM features for training.
                                   Features from the base model.
+    base_fitted_model_name (str): Name of the base model to compare the current model with.
     target_labels_list (list): list of target labels
     new_features_file_name (str): name of the new added feature data table
     fitted_model_name (str): name of the fitted model based on which
@@ -45,6 +46,7 @@ class SelectModelFeatures():
                  fitted_model_name:str,
                  fitted_model_algo:str,
                  base_sfm_features_name:str,
+                 base_fitted_model_name:str,
                  X_tr,
                  X_vlte,
                  split_type:str,
@@ -57,6 +59,7 @@ class SelectModelFeatures():
         self.fitted_model_name = fitted_model_name
         self.fitted_model_algo = fitted_model_algo
         self.base_sfm_features_name = base_sfm_features_name
+        self.base_fitted_model_name = base_fitted_model_name
         self.X_tr = X_tr
         self.X_vlte = X_vlte
         self.split_type = split_type
@@ -92,11 +95,9 @@ class SelectModelFeatures():
             new_model_cols = dt.columns
 
             for col in new_model_cols:
-                print(col)
                 for label in self.target_labels_list:
-                    print(label)
                     new_features_dict[label].append(col)
-                    print(col in new_features_dict[label])
+                    #print(col in new_features_dict[label])
 
         return new_features_dict
 
@@ -225,7 +226,7 @@ class SelectModelFeatures():
         return fitted_model_features
 
 
-    def select_features(self, cv_new_model, compute_features:bool=True):
+    def select_features(self, cv_new_model, fitted_sfm:bool=True, compute_features:bool=True):
         """Select features of the newly trained model.
 
         Arguments
@@ -260,15 +261,22 @@ class SelectModelFeatures():
                 
                 # Only 1 new feature was added - check CV loss difference
                 if len(new_model_cols) == 1:
+                    print(f'Detected 1 new feature')
                     # Read in the CVloss of the base model
+                    #TODO WHat if base is not SFM?
                     base_model_loss = pd.read_csv(os.path.join(config.MODELS_DIR,
-                                                            self.fitted_model_name + '_' +
+                                                            self.base_fitted_model_name + '_' +
                                                             self.split_type + '_sfm_cvloss.csv'),
                                                 index_col='target')
-                    base_model_loss = base_model_loss.to_dict()[self.fitted_model_name + '_' +
+                    base_model_loss = base_model_loss.to_dict()[self.base_fitted_model_name + '_' +
                                                                 self.split_type + '_sfm']
+                    print(f'Base model cvloss: {self.base_fitted_model_name + "_" + self.split_type + "_sfm_cvloss.csv"}')
+                    
                     # Load fitted model features
-                    path_cols = self.fitted_model_name + '_' + self.split_type + '_COLS.txt'
+                    if fitted_sfm:
+                        path_cols = self.fitted_model_name + '_' + self.split_type + '_COLS_sfm.txt'
+                    else:
+                        path_cols = self.fitted_model_name + '_' + self.split_type + '_COLS.txt'
                     print(f'Reading fitted model {path_cols}')
                     
                     with open(path_cols) as json_file:
@@ -280,6 +288,7 @@ class SelectModelFeatures():
                     for i in self.target_labels_list:
                         base_loss = base_model_loss[i]
                         new_loss = cv_new_model[i]
+                        #print(f'{i}; base loss: {base_loss}; new_loss: {new_loss}')
                         if new_loss > base_loss:
                             cols_to_remove[i] = new_model_cols[0]
                     #print(f'Features to remove: {cols_to_remove}')

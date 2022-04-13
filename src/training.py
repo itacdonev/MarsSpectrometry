@@ -239,13 +239,13 @@ def trainCV_label(X,
         logloss[label] = np.sum(oof_logloss)/cv_folds
 
         if base_model_name:
-            ll_diff_to_base = logloss[label] - cv_base_model[label]
+            ll_diff_to_base = np.round(logloss[label] - cv_base_model[label],5)
             if ll_diff_to_base < 0:
-                print(colored(f'{label}', 'yellow'),
-                    colored(f'- LogLoss decreased by {ll_diff_to_base}', 'green'))
+                print(colored(f'{label}: LogLoss={np.round(logloss[label],5)}', 'yellow'),
+                    colored(f'-> {ll_diff_to_base}', 'green'))
             else:
-                print(colored(f'{label}', 'yellow'),
-                    colored(f'- LogLoss increased by {ll_diff_to_base}', 'red'))
+                print(colored(f'{label}: LogLoss={np.round(logloss[label],5)}', 'yellow'),
+                    colored(f'-> {ll_diff_to_base}', 'red'))
         else:
             print(colored(f'LogLoss {logloss[label]}', 'yellow'))
 
@@ -419,9 +419,11 @@ def train_full_model(X,
     # Save feature names of the trained model
     if not fts_select_cols:
         file_name = sub_name + '_COLS.txt'
-        with open(file_name, 'w') as file:
-            file.write(json.dumps(feature_names_dict))
-        print(f'Saving {file_name}')
+    else:
+        file_name = sub_name + '_COLS_sfm.txt'
+    with open(file_name, 'w') as file:
+        file.write(json.dumps(feature_names_dict))
+    print(f'Saving {file_name}')
     
     return submission
 
@@ -513,7 +515,7 @@ def train_tbl(df_train, df_labels,
 
 def compute_valid_loss(submission_file_VT,
                        valid_files,
-                       valid_labels, 
+                       valid_labels,
                        target_label_list,
                        sub_name:str,
                        fts_select_cols:str=None):

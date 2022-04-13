@@ -176,8 +176,8 @@ class SelectModelFeatures():
         print('Refinting the model based on the threshold')
         sfm_loss = {}
         new_features_dict = {}
-        for label in self.target_labels_list:
-            print(colored(f'LABEL: {label}', 'blue'))
+        for label in tqdm(self.target_labels_list):
+            #print(colored(f'LABEL: {label}', 'blue'))
 
             # Load saved model
             MODEL_CLF = self.fitted_model_name + '_' + self.split_type + '_' + label + '.joblib.dat'

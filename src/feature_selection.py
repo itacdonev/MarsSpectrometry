@@ -14,6 +14,41 @@ from sklearn.metrics import log_loss
 from src import config, model_selection
 
 
+def combine_sfm_features(base_sfm_features_name,
+                         target_labels_list,
+                         fitted_model_name,
+                         fitted_model_algo,
+                         split_type):
+    
+    # Initialize dictionary with labels as keys
+    new_features_dict = dict.fromkeys(target_labels_list,[])
+    
+    if len(base_sfm_features_name) > 1:
+        for i in base_sfm_features_name:
+            print(f'Adding {i}')
+            # Read in the file
+            path_cols = i + '_' + fitted_model_algo + '_' + split_type + '_SFM_COLS.txt'
+            with open(path_cols) as json_file:
+                fts_dict_temp = json.load(json_file)
+
+            for label in target_labels_list:
+                a = new_features_dict[label]
+                b = fts_dict_temp[label]
+                c = a + b
+                new_features_dict[label] = c
+            
+    # Save dictionary
+    file_name = fitted_model_name + '_' + fitted_model_algo + '_' + split_type + '_SFM_COLS.txt'
+    with open(file_name, 'w') as file:
+        file.write(json.dumps(new_features_dict))
+    print(f'Saving {file_name}')
+    
+    # print(f'Number of features')
+    # for label in new_features_dict:
+    #     print(f'{label} - {len(new_features_dict[label])}')
+
+
+
 class SelectModelFeatures():
     """
     Select features based on the trained model using
@@ -45,7 +80,7 @@ class SelectModelFeatures():
                  new_features_file_name:str,
                  fitted_model_name:str,
                  fitted_model_algo:str,
-                 base_sfm_features_name:str,
+                 base_sfm_features_name,
                  base_fitted_model_name:str,
                  X_tr,
                  X_vlte,
@@ -78,6 +113,7 @@ class SelectModelFeatures():
 
     def load_features(self):
         print(colored(f'Loading feature column names', 'blue'))
+        # Load features from the base model
         path_cols = self.base_sfm_features_name + '_' +\
                     self.fitted_model_algo + '_' +\
                     self.split_type + '_SFM_COLS.txt'
@@ -281,7 +317,7 @@ class SelectModelFeatures():
                                               self.split_type + '.csv'))
                 new_model_cols = dt.columns
                 print(f'New features from {self.new_features_file_name + "_" + self.split_type + ".csv"}')
-
+    
                 # Only 1 new feature was added - check CV loss difference
                 if len(new_model_cols) == 1:
                     print(f'Detected 1 new feature')
@@ -340,4 +376,13 @@ class SelectModelFeatures():
         
         for label in self.target_labels_list:
             print(f'{label}: {len(sfm_columns[label])}')
-    
+
+
+    def select_single_feature(self):
+        """
+        Select feature based on a single feature training
+        and comparing cv loss. If cv loss of current model is better
+        than the base model the feature is added to the model feature list.
+        """
+
+        pass

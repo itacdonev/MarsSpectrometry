@@ -27,7 +27,13 @@ def combine_sfm_features(base_sfm_features_name,
         for i in base_sfm_features_name:
             print(f'Adding {i}')
             # Read in the file
-            path_cols = i + '_' + fitted_model_algo + '_' + split_type + '_SFM_COLS.txt'
+            try:
+                path_cols = i + '_' + fitted_model_algo + '_' + split_type + '_SFM_COLS.txt'
+            except:
+                print(f'No file {path_cols}')
+            else:
+                path_cols = i + '_' + fitted_model_algo + '_' + split_type + '_COLS_sfm.txt'
+                
             with open(path_cols) as json_file:
                 fts_dict_temp = json.load(json_file)
 
@@ -114,9 +120,16 @@ class SelectModelFeatures():
     def load_features(self):
         print(colored(f'Loading feature column names', 'blue'))
         # Load features from the base model
-        path_cols = self.base_sfm_features_name + '_' +\
-                    self.fitted_model_algo + '_' +\
-                    self.split_type + '_SFM_COLS.txt'
+        try:
+            path_cols = self.base_sfm_features_name + '_' +\
+                        self.fitted_model_algo + '_' +\
+                        self.split_type + '_SFM_COLS.txt'
+        except:
+            print(f'No file {path_cols}')
+        else:
+            path_cols = self.base_sfm_features_name + '_' +\
+                        self.fitted_model_algo + '_' +\
+                        self.split_type + '_COLS_sfm.txt'
         print(f'Reading {path_cols}')
         with open(path_cols) as json_file:
                 new_features_dict = json.load(json_file)

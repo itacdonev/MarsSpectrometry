@@ -533,7 +533,7 @@ def compute_valid_loss(submission_file_VT,
         y_actual = valid_labels[label].iloc[:len(valid_files)]
         y_preds = df_sub[label].iloc[:len(valid_files)]
         model_ll[label] = log_loss(y_actual.values, y_preds.values, labels=(0,1))
-        
+
     #print(f'Average Log Loss of full model: {np.mean(list(model_ll.values()))}')
     valid_loss = pd.DataFrame.from_dict(model_ll, orient='index')
     if fts_select_cols:
@@ -619,3 +619,101 @@ def model_conf_mat(target_labels_list,
             model_cmat = model_cmat + cfmat
 
     return model_conf_mat
+
+class TrainLabel():
+    """
+    Train each label separately feeding one feature group at a time.
+    
+    Arguments
+    ---------
+    
+    """
+    
+    def __init__(self,
+                 target_labels_list:list,
+                 df_train,
+                 df_train_labels,
+                 df_valid,
+                 feature_group:str,
+                 split_type:str,
+                 model_algo:str,
+                 save_file_suffix:str):
+        self.target_labels_list=target_labels_list
+        self.df_train=df_train
+        self.df_train_labels=df_train_labels
+        self.df_valid=df_valid
+        self.feature_group=feature_group
+        self.split_type=split_type
+        self.model_algo=model_algo
+        self.save_file_suffix=save_file_suffix
+    
+    # ===== STEP 1. =====
+    # Train against all feature groups to get the best base model
+    def get_best_base_model_label(self):
+        """
+        Train each label with all feature groups and record
+        the best model.
+        
+        Returns
+        -------
+        base_model_fts_group (dict) = Name of the feature group which is best in CVloss.
+        
+        """
+        # Dict= label: best feature group name
+        base_model_fts_group = {}
+
+        for fts_name_group in self.feature_group: # E.g. fts_topmz
+            
+            # Name of the file to save submission
+            model_name = fts_name_group + '_' + self.model_algo
+            
+            # Train all labels for the specified feature
+            cvloss, submission_fts_name = train_tbl(
+                df_train=self.df_train,
+                df_labels=self.df_train_labels,
+                target_list=self.target_labels_list,
+                df_test=self.df_valid,
+                split_type=self.split_type,
+                model_algo=self.model_algo,
+                sub_name=model_name + '_' + self.split_type
+                )
+            base_model_fts_group[fts_name_group] = cvloss
+        return base_model_fts_group
+        
+    # Loop over features group list
+    # select feature group
+    # Acquire SFM cols
+    # Add columns to the existing FTS_TRAIN_COLS
+    # Train model - record CVL
+    # If CVL < previous loss , 
+    #       train full model record VLoss. 
+    #       add features to MODEL FTS
+        
+    
+def train_single_label(target_labels_list:list,
+                        df_train,
+                        df_valid,
+                        feature_group:str,
+                        model_algo:str,
+                        split_type:str):
+    """
+    Train each label separately feeding one feature group at a time.
+    
+    Arguments
+    ---------
+    feature_group (str): List of feature names as they are saved in DATA_DIR_OUT
+    
+    """
+    FTS_TESTED = []         # Feature groups which have been trained
+    MODEL_FEATURES = []     # Feature groups for the final model
+    
+    # Train against all feature groups to get the best base model
+    
+    for FTS_GROUP in feature_group:
+        # Read in the SFM columns for the new feature to train
+        fts_group_file_name = FTS_GROUP + '_' + model_algo + '_' + split_type + '_SFM_COLS.csv'
+        # Check whether there is a base model, i.e. whether we have trained any features
+        # and retained them
+        if len(MODEL_FEATURES) > 1:
+            # We need to combine features
+            pass

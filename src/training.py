@@ -571,4 +571,51 @@ def compute_valid_loss(submission_file_VT,
     
 #     def __init__(self):
 #         pass
+
+from sklearn.metrics import confusion_matrix
+import seaborn as sns
+def plot_conf_matrix(y_preds_class, y_actual_class, plot_cmat:bool=True):
+    """
+    Plot confusion matrix from the fitted model.
+    """
+    cf_matrix = confusion_matrix(y_actual_class, y_preds_class)
     
+    if plot_cmat:
+        ax = sns.heatmap(cf_matrix, annot=True, cmap='Blues')
+        ax.set_title('Confusion Matrix\n\n');
+        ax.set_xlabel('\nPredicted Values')
+        ax.set_ylabel('Actual Values ');
+
+        ## Ticket labels - List must be in alphabetical order
+        ax.xaxis.set_ticklabels(['False','True'])
+        ax.yaxis.set_ticklabels(['False','True'])
+
+        ## Display the visualization of the Confusion Matrix.
+        plt.show()
+    
+    return cf_matrix
+
+
+def model_conf_mat(target_labels_list,
+                   valid_labels,
+                   model_submission):
+    """Compute confusion matrix for the final
+    model by adding all the individual confusion
+    matrices.
+    """
+    model_cmat = pd.DataFrame()
+    for label in target_labels_list:
+        label_sub = model_submission.iloc[:valid_labels.shape[0]][[label]].copy()
+        label_sub[label+'_c'] = np.where(label_sub[label] > 0.5,1,0)
+        y_preds_class = label_sub[label+'_c'].values
+        y_actual_class = valid_labels[label].values
+        dt = pd.concat([pd.Series(y_preds_class), pd.Series(y_actual_class)], axis=1)
+        dt.columns = ['prediction','actual']
+        cfmat = pd.crosstab(dt.actual, dt.prediction)
+
+        if not model_cmat.empty:
+            model_cmat = cfmat
+        else:
+            model_cmat = model_cmat + cfmat
+
+    return model_conf_mat

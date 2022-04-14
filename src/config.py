@@ -18,3 +18,7 @@ MZ_THRESHOLD = 100
 MZ_CNT_THRESHOLD = 100
 CORRELATION_THRESHOLD = 0.6
 NO_PEAKS_CALC = 4
+FTS_GROUPS = ['fts_topmz', 'fts_peak_widths', 'fts_range_abun_to_temp',
+              'fts_mzstats', 'fts_mra_tempmz', 'fts_lr_corr_mz4', 'fts_corr_mz4',
+              'fts_cntpk_mratt', 'fts_slope_tt', 'fts_mz_spectra',
+              'fts_mzstats']

@@ -1,0 +1,1 @@
+{"basalt": ["lr_corr_mz4"], "carbonate": ["lr_corr_mz4"], "chloride": ["lr_corr_mz4"], "iron_oxide": ["lr_corr_mz4"], "oxalate": ["lr_corr_mz4"], "oxychlorine": ["lr_corr_mz4"], "phyllosilicate": ["lr_corr_mz4"], "silicate": ["lr_corr_mz4"], "sulfate": ["lr_corr_mz4"], "sulfide": ["lr_corr_mz4"]}

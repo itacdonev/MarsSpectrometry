@@ -536,8 +536,13 @@ def compute_valid_loss(submission_file_VT,
         
     #print(f'Average Log Loss of full model: {np.mean(list(model_ll.values()))}')
     valid_loss = pd.DataFrame.from_dict(model_ll, orient='index')
-    valid_loss.columns = [sub_name + 'V']
+    if fts_select_cols:
+        valid_loss.columns = [sub_name + '_sfm_V']
+    else:
+        valid_loss.columns = [sub_name + 'V']
+
     valid_loss.index = valid_loss.index.set_names('target')
+
     if fts_select_cols:
         valid_loss.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_sfm_Vloss.csv'),
                                 index=True)

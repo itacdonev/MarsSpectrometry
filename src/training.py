@@ -554,21 +554,21 @@ def compute_valid_loss(submission_file_VT,
 
 
 
-class TrainGroupSingle():
-    """
-    Train a single set of feature or feature by feature.
-    There are two different set of features: groups and individual.
-    If the feature is group type, then it should be trained and reduced
-    using one of the dimensinality reduction technique: SelectFromModel()
-    given an optimal threshold. 
-    If the feature is individual, then it should be tested against a base model 
-    individually and not as part of a group.
+# class TrainGroupSingle():
+#     """
+#     Train a single set of feature or feature by feature.
+#     There are two different set of features: groups and individual.
+#     If the feature is group type, then it should be trained and reduced
+#     using one of the dimensinality reduction technique: SelectFromModel()
+#     given an optimal threshold. 
+#     If the feature is individual, then it should be tested against a base model 
+#     individually and not as part of a group.
     
-    Arguments
-    ---------
+#     Arguments
+#     ---------
     
-    """
+#     """
     
-    def __init__(self):
-        pass
+#     def __init__(self):
+#         pass
     

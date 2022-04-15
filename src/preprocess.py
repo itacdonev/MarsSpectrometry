@@ -163,7 +163,7 @@ def scale_abun(df):
     return df
 
 
-def smooth_mz_ts(df_sample, 
+def smooth_mz_ts(df_sample,
                  smoothing_type:str='gauss',
                  gauss_sigma:int=5,
                  ma_step:int=None):
@@ -193,7 +193,8 @@ def preprocess_samples(df,
                        smoothing_type:str='gauss',
                        gauss_sigma:int=5,
                        ma_step:int=None,
-                       remove_He:bool=True):
+                       remove_He:bool=True,
+                       lr_time_temp:bool=False):
     # Preprocess m/z
     df = preprocess_mz_value(df, remove_He=remove_He)
     
@@ -212,12 +213,19 @@ def preprocess_samples(df,
     # MinMax scale abundance
     df = scale_abun(df)
     
-    # Smoothing
+    # Smoothing abundance
     if smooth:
-        df = smooth_mz_ts(df, 
+        df = smooth_mz_ts(df,
                           smoothing_type=smoothing_type,
                           gauss_sigma=gauss_sigma,
                           ma_step=ma_step)
+    if lr_time_temp:
+        # Transform time temp
+        lr = LinearRegression()
+        X = np.array(df['time']).reshape(-1,1)
+        y = df['temp'].values
+        lr.fit(X,y)
+        df['temp'] = lr.predict(np.array(df['temp']).reshape(-1,1))
         
     return df
 

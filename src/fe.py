@@ -142,7 +142,7 @@ class CreateFeatures:
         
     
     # TempBin+MZ = Max relative abundance
-    def fts_mra_tempmz(self):
+    def fts_mra_tempmz(self, lr_time_temp:bool=False):
         """
         Bin temperature into 100 degree bins for each
         m/z values. Compute max relative abundance for
@@ -155,7 +155,7 @@ class CreateFeatures:
         
         # Loop over all sample_id and compute. Add computation to dt.
         print(f'Number of samples: {len(self.files_dict)}')
-        for i in self.files_dict:
+        for i in tqdm(self.files_dict):
             sample_name = self.metadata.iloc[i]['sample_id']
             df_sample = preprocess.get_sample(self.metadata, i)
             #TODO all these don't have to be declaed for the class
@@ -168,7 +168,8 @@ class CreateFeatures:
                                                self.smooth,
                                                self.smoothing_type,
                                                self.gauss_sigma,
-                                               self.ma_step)
+                                               self.ma_step,
+                                               lr_time_temp)
             #ion_temp_dict[sample_name] = ht_pivot
             dt = pd.concat([dt, ht_pivot])
         
@@ -364,8 +365,8 @@ class CreateFeatures:
         
         for idx in tqdm(self.files_dict):
             sample_name = self.metadata.iloc[idx]['sample_id']
-            area_sample = features.sample_abund_area(self.metadata, 
-                                                    idx, 
+            area_sample = features.sample_abund_area(self.metadata,
+                                                    idx,
                                                     self.detrend_method)
             areas_dict[idx] = area_sample
             
@@ -538,7 +539,7 @@ class CreateFeatures:
 
 
 
-    # Temp IQ4 stats per mz ratio
+    # TODO Temp IQ4 stats per mz ratio
     def fts_tempIQ_mzstats(self):
         """
         Divide temperature in each sample into 4 IQ bins and compute stats for all such as:
@@ -612,3 +613,37 @@ class CreateFeatures:
                          index=False)
         
         return df_all_samples_width
+
+
+    def fts_mz_maxabun(self):
+        df = pd.DataFrame()
+        
+        for file_idx in tqdm(self.files_dict):
+            df_mz = features.mz_maxabun(self.metadata,
+                                        file_idx,
+                                        self.detrend_method)
+            df = pd.concat([df, df_mz], axis=0)
+        
+        df = df.fillna(0)
+        
+        # Save feature data frame
+        df.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                    self.fts_name + '_' + self.file_suffix + '.csv'),
+                         index=False)
+        return df
+    
+    
+    def fts_timetemp_mra(self):
+        df = pd.DataFrame()
+        for file_idx in tqdm(self.files_dict):
+            df_sample = features.timetemp_mra(
+                self.metadata,
+                file_idx,
+                self.detrend_method)
+            df = pd.concat([df, df_sample], axis=0)
+        df = df.fillna(0)
+        # Save feature data frame
+        df.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                    self.fts_name + '_' + self.file_suffix + '.csv'),
+                         index=False)
+        return df

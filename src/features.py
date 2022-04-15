@@ -266,7 +266,33 @@ def features_ion_duration_maxtemp(df_meta, file_paths, ion_list):
     return df
 
 
-
+# ===== MASS OVER TEMPERATURE RANGE =====
+def mass_loss_tempb(df_sample, sample_name):
+    """Compute total mass per temp as:
+        1. slope of temp ~ total mass
+        2. total mass per temp bin
+    """
+    temprange = pd.interval_range(start=-100, end=1500, freq=100)
+    df_sample['mass_abun'] = df_sample['m/z']*df_sample['abun_scaled']
+    df_sample['temp_cbin'] = pd.cut(df_sample['temp'], bins=temprange)
+    df_sample['mass_at_temp'] = df_sample.groupby('temp_cbin')['mass_abun'].transform('sum')
+    df_sample = df_sample[['temp_cbin', 'mass_at_temp']].drop_duplicates()  
+    df_sample['sample_id'] = sample_name
+    
+    df_pivot = df_sample.pivot(index='sample_id',
+                               columns='temp_cbin',
+                               values='mass_at_temp')
+    df_pivot = df_pivot.add_prefix('mass_at_temp_')
+    
+    # Rename columns
+    t_cols = df_pivot.columns
+    remove_chars = "(,]"
+    for char in remove_chars:
+        t_cols = [i.replace(char,'') for i in t_cols]
+    t_cols = [i.replace(' ','_') for i in t_cols]
+    df_pivot.columns = t_cols
+    
+    return df_pivot
         
 # ===== SPECTRA - MOLECULAR ION DETECTION =====
 

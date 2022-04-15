@@ -1,0 +1,1 @@
+{"basalt": ["instrument_type"], "carbonate": ["instrument_type"], "chloride": ["instrument_type"], "iron_oxide": ["instrument_type"], "oxalate": ["instrument_type"], "oxychlorine": ["instrument_type"], "phyllosilicate": ["instrument_type"], "silicate": ["instrument_type"], "sulfate": ["instrument_type"], "sulfide": ["instrument_type"]}

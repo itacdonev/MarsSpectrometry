@@ -128,7 +128,7 @@ def trainCV_label(X,
     # Get CV loss of the base model for comparison
     if base_model_name:
         file_path = os.path.join(config.MODELS_DIR, base_model_name + '_cvloss.csv')
-        cv_base_model = pd.read_csv(file_path, 
+        cv_base_model = pd.read_csv(file_path,
                                     index_col='target')
         cv_base_model = cv_base_model.to_dict()[cv_base_model.columns[0]]
         print(f'Basel model CVloss: {file_path}')
@@ -268,8 +268,7 @@ def train_full_model(X,
                      target_encode_fts:list=None,
                      test_sam:bool=False,
                      fts_select_cols:dict=None,
-                     show_fi_plots:bool=False,
-                     train_single:bool=False
+                     show_fi_plots:bool=False
                      ):
     """
     Train full model
@@ -414,9 +413,6 @@ def train_full_model(X,
         else:
             joblib.dump(clf, os.path.join(config.CLF_DIR,
                                         sub_name + '_' + label + ".joblib.dat"))
-        if train_single:
-            joblib.dump(clf, os.path.join(config.CLF_DIR,
-                                        sub_name + ".joblib.dat"))
         # Make predictions
         submission[label] = clf.predict_proba(Xtest)[:,1]
 
@@ -444,8 +440,7 @@ def train_tbl(df_train, df_labels,
               verbose:bool=False,
               test_sam:bool=False,
               fts_select_cols:dict=None,
-              early_stopping:bool=False,
-              train_single:bool=False):
+              early_stopping:bool=False):
     """
     Train tabular data. The training is done on CV and full dataset.
 
@@ -503,8 +498,7 @@ def train_tbl(df_train, df_labels,
                                   target_encode=target_encode,
                                   target_encode_fts=target_encode_fts,
                                   test_sam=test_sam,
-                                  fts_select_cols=fts_select_cols,
-                                  train_single=train_single)
+                                  fts_select_cols=fts_select_cols)
 
     # Save submission file
     if fts_select_cols:

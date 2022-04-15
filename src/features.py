@@ -16,12 +16,15 @@ from src import config, preprocess, utils
 
 # BENCHMARK FEATURES
 # Bin the temp and compute processes max abundance for each bin
-def bin_temp_abund(df_sample, sample_name:str, detrend_method:str,
-                   remove_mz_cnt:bool=False, remove_mz_thrs=None,
+def bin_temp_abund(df_sample, sample_name:str, 
+                   detrend_method:str,
+                   remove_mz_cnt:bool=False, 
+                   remove_mz_thrs=None,
                    smooth:bool=False,
                     smoothing_type:str='gauss',
                     gauss_sigma:int=5,
-                    ma_step:int=None):
+                    ma_step:int=None,
+                    lr_time_temp:bool=False):
     """
     Create equal bins for temperature
     Compute max for relative abundance for each bin and ion type
@@ -40,7 +43,8 @@ def bin_temp_abund(df_sample, sample_name:str, detrend_method:str,
                                               smooth=smooth,
                                               smoothing_type=smoothing_type,
                                                 gauss_sigma=gauss_sigma,
-                                                ma_step=ma_step)
+                                                ma_step=ma_step,
+                                                lr_time_temp=lr_time_temp)
     
     # Compute max relative abundance
     if smooth:
@@ -649,7 +653,8 @@ def sample_abund_area(metadata, idx, detrend_method):
     the whole sample given time.
     """
     df_sample = preprocess.get_sample(metadata, idx)
-    df_sample = preprocess.preprocess_samples(df_sample, detrend_method=detrend_method)
+    df_sample = preprocess.preprocess_samples(df_sample, 
+                                              detrend_method=detrend_method)
     df_sample = df_sample.sort_values(by=['time', 'abun_scaled'])
 
     # Sum all mz values per time to get a sample mz value per time
@@ -838,6 +843,8 @@ def dl_ts(metadata, max_time):
     return df
     
       
+
+# ===== ??????? =====
 
 # Compute average abundance for each sample
 def compute_abundance_per_ion(df_sample, sample_name:str, stat:str):
@@ -1494,3 +1501,73 @@ def peak_width_mz(metadata,
     else:
         #print(f'No peaks in mz {mz} for sample {sample_name}')
         df_widths_pivot = pd.DataFrame()
+
+
+
+# ===== MZ MAX ABUNDANCE ======
+# Compute max abundance for each mz ratio per sample
+# Ther should be 100 columns - this basically would represent
+# the MS plot.
+
+def mz_maxabun(metadata,
+               idx,
+               detrend_method):
+    sample_name = metadata.iloc[idx]['sample_id']
+    df_sample = preprocess.get_sample(metadata, idx)
+    df_sample = preprocess.preprocess_samples(df_sample,
+                                              detrend_method=detrend_method)
+    mz_values = np.arange(0,100,1, dtype='float')
+    
+    df_agg_mz = df_sample.groupby('m/z')['abun_scaled'].agg('max')
+    df_agg_mz = df_agg_mz.reset_index()
+    df_agg_mz['m/z'] = ['mz_'+str(i) for i in df_agg_mz['m/z']]
+    df_agg_mz['m/z'] = [i.removesuffix('.0') for i in df_agg_mz['m/z']]
+    df_agg_mz.columns = ['m/z', 'mz_maxabun']
+    df_agg_mz['sample_id'] = sample_name
+    df_pivot = df_agg_mz.pivot(index='sample_id',
+                               columns='m/z',
+                               values='mz_maxabun')
+    df_pivot = df_pivot.add_suffix('_maxabun')
+
+    return df_pivot
+
+# ===== TIME-TEMP BIN: max abundance =====
+def timetemp_mra(metadata,
+                 idx,
+                 detrend_method):
+    sample_name = metadata.iloc[idx]['sample_id']
+    df_sample = preprocess.get_sample(metadata, idx)
+    df_sample = preprocess.preprocess_samples(df_sample,
+                                              detrend_method=detrend_method)
+    
+    timerange = pd.interval_range(start=-10, end=2000, freq=200)
+    temprange = pd.interval_range(start=-100, end=1500, freq=100)
+    
+    df_sample['time_bin'] = pd.cut(df_sample['time'], bins=timerange)
+    df_sample['temp_bin'] = pd.cut(df_sample['temp'], bins=temprange)
+    
+    ht = df_sample.groupby(['m/z', 'time_bin','temp_bin'])['abun_scaled'].agg('max').reset_index()
+    ht = ht.replace(np.nan, 0)
+    ht['sample_id'] = sample_name
+    
+    ht.columns = ['m/z', 'timeb','tempb', 'mra', 'sample_id']
+    ht['m/z'] = ['mz_'+str(i) for i in ht['m/z']]
+    ht['m/z'] = [i.removesuffix('.0') for i in ht['m/z']]
+    ht['timeb'] = ['timeb'+str(i) for i in ht['timeb']]
+    ht['tempb'] = ['tempb'+str(i) for i in ht['tempb']]
+    
+    ht_pivot = ht.pivot(index='sample_id',
+                columns=['m/z', 'timeb', 'tempb'],
+                values='mra')
+    ht_pivot.columns = ht_pivot.columns.map(lambda x: '_'.join([str(i) for i in x]))
+    ht_pivot = ht_pivot.reset_index().rename_axis(None, axis=1)
+    
+    # Rename columns
+    t_cols = ht_pivot.columns
+    remove_chars = "(,]"
+    for char in remove_chars:
+        t_cols = [i.replace(char,'') for i in t_cols]
+    t_cols = [i.replace(' ','_') for i in t_cols]
+    ht_pivot.columns = t_cols
+    
+    return ht_pivot

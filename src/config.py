@@ -22,3 +22,4 @@ FTS_GROUPS = ['fts_topmz', 'fts_peak_widths', 'fts_range_abun_to_temp',
               'fts_mzstats', 'fts_mra_tempmz', 'fts_lr_corr_mz4', 'fts_corr_mz4',
               'fts_cntpk_mratt', 'fts_slope_tt', 'fts_mz_spectra',
               'fts_mzstats']
+WOE_BINS = 5

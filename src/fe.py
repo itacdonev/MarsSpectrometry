@@ -538,6 +538,26 @@ class CreateFeatures:
         return temp
 
 
+    # Mass at tempbin
+    def fts_mass_loss_tempb(self):
+
+        df = pd.DataFrame()
+
+        for file_idx in tqdm(self.files_dict):
+            df_sample = preprocess.get_sample(self.metadata, file_idx)
+            df_sample = preprocess.preprocess_samples(df_sample, self.detrend_method)
+            sample_name = self.metadata.iloc[file_idx]['sample_id']
+            df_mass_sample = features.mass_loss_tempb(df_sample, sample_name)
+            df = pd.concat([df, df_mass_sample], axis=0)
+
+        df = df.replace(np.nan, 0)
+
+        # Save feature data frame
+        df.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                    self.fts_name + '_' + self.file_suffix + '.csv'),
+                         index=False)
+        return df
+        
 
     # TODO Temp IQ4 stats per mz ratio
     def fts_tempIQ_mzstats(self):
@@ -556,10 +576,11 @@ class CreateFeatures:
     
     
     # Peak widths
-    def fts_peak_widths(self, no_peaks_calc):
+    def fts_peak_widths(self, no_peaks_calc,
+                        width_perc:list=['10', '50', '90']):
         
         # Create data frame to store calculation on sample level
-        width_names = ['perc'+str(i) for i in ['10', '50', '90']]
+        width_names = ['perc'+str(i) for i in width_perc]
         mz_names = ['mz' + str(i) for i in range(0,100,1)]
         peak_names = ['peak'+str(i) for i in range(1,no_peaks_calc+1,1)]
         column_names = []
@@ -633,6 +654,23 @@ class CreateFeatures:
         return df
     
     
+    def fts_instr(self):
+        """Binary indicator whether the sample is SAM testbed or not.
+        """
+        df = self.metadata[self.metadata.index.isin(self.files_dict.keys())].copy()
+        df['instrument_type'] = np.where(df['instrument_type'] == 'commercial', 0, 1)
+        df = df[['instrument_type']].copy()
+        
+        # Save feature data frame
+        df.to_csv(os.path.join(config.DATA_DIR_OUT,
+                                    self.fts_name + '_' + self.file_suffix + '.csv'),
+                         index=False)
+        return df
+        
+
+
+        
+        
     def fts_timetemp_mra(self):
         df = pd.DataFrame()
         for file_idx in tqdm(self.files_dict):

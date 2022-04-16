@@ -797,7 +797,9 @@ def range_abun_to_temp(metadata, idx, detrend_method):
 # ===== DEEP LEARNING =====
 #TODO Add more features and run again
 #TODO Add to the final ensemble - check maybe some of the targets will benefit
-def dl_time_pivot(metadata, n_sample, max_time):
+def dl_time_pivot(metadata, n_sample, max_time,
+                  detrend_method:str='min',
+                  smooth:bool=False):
     """
     Process the time series of a sample to create a df
     where each row is a  distinct time. Columns represent
@@ -810,7 +812,9 @@ def dl_time_pivot(metadata, n_sample, max_time):
     # ----- SAMPLE PROCESSING -----
     # Load and preprocess the sample
     df_sample = preprocess.get_sample(metadata, n_sample)
-    df_sample = preprocess.preprocess_samples(df_sample)
+    df_sample = preprocess.preprocess_samples(df_sample,
+                                              detrend_method=detrend_method,
+                                              smooth=smooth)
     
     # Get sample name and instrument
     sample_name = metadata.iloc[n_sample]['sample_id']
@@ -852,7 +856,9 @@ def dl_time_pivot(metadata, n_sample, max_time):
     
     return df_pivot
     
-def dl_ts(metadata, max_time):
+def dl_ts(metadata, max_time,
+          detrend_method:str='min',
+          smooth:bool=False):
     """
     Create a 3D array of time series for DL models.
     1D - samples
@@ -863,7 +869,7 @@ def dl_ts(metadata, max_time):
     df = pd.DataFrame()
     
     for i in tqdm(range(metadata.shape[0])):
-        df_pivot = dl_time_pivot(metadata, i, max_time)
+        df_pivot = dl_time_pivot(metadata, i, max_time, detrend_method, smooth)
         df = pd.concat([df, df_pivot], axis=0)
     
     return df

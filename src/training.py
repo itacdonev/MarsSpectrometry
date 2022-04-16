@@ -3,6 +3,7 @@ Training functions including cross validation and full
 model training.
 """
 from src import config, features, feature_selection, model_selection
+from src.transformers import TransformWOE
 import os, json, joblib
 from collections import Counter
 import warnings
@@ -85,7 +86,8 @@ def trainCV_label(X,
                   target_encode:bool=False,
                   target_encode_fts:list=None,
                   fts_select_cols:dict=None,
-                  early_stopping:bool=False):
+                  early_stopping:bool=False,
+                  woe_trf:bool=False):
     """
     Training pipeline 
         - tabular one target label at a time
@@ -175,6 +177,14 @@ def trainCV_label(X,
             counter = Counter(y_train)
             estimate = counter[0] / counter[1]
 
+            # ----- WOE TRANSFORMATION -----
+            if woe_trf:
+                WOE_FEATURES = X_train.columns.tolist()
+                tr_woe = TransformWOE(WOE_FEATURES,
+                                    config.WOE_BINS)
+                Xtrain = tr_woe.fit_transform(X_train, y_train)
+                Xvalid = tr_woe.transform(X_valid)
+            
             # ----- TARGET ENCODING -----
             if target_encode:
                 #print('Encoding ...')
@@ -268,8 +278,8 @@ def train_full_model(X,
                      target_encode_fts:list=None,
                      test_sam:bool=False,
                      fts_select_cols:dict=None,
-                     show_fi_plots:bool=False
-                     ):
+                     show_fi_plots:bool=False,
+                     woe_trf:bool=False):
     """
     Train full model
     
@@ -303,6 +313,14 @@ def train_full_model(X,
         counter = Counter(y)
         estimate = counter[0] / counter[1]
 
+        # ----- WOE TRANSFORMATION -----
+        if woe_trf:
+            WOE_FEATURES = X.columns.tolist()
+            tr_woe = TransformWOE(WOE_FEATURES,
+                                  config.WOE_BINS)
+            Xtrain = tr_woe.fit_transform(X, y)
+            Xtest = tr_woe.transform(Xte)
+            
         # ----- TARGET ENCODING -----
         if target_encode:
             #print('Encoding ...')
@@ -410,6 +428,9 @@ def train_full_model(X,
         if fts_select_cols:
             joblib.dump(clf, os.path.join(config.CLF_DIR,
                                         sub_name + '_sfm_' + label + ".joblib.dat"))
+        elif woe_trf:
+            joblib.dump(clf, os.path.join(config.CLF_DIR,
+                                        sub_name + '_woe_' + label + ".joblib.dat"))
         else:
             joblib.dump(clf, os.path.join(config.CLF_DIR,
                                         sub_name + '_' + label + ".joblib.dat"))
@@ -419,6 +440,8 @@ def train_full_model(X,
     # Save feature names of the trained model
     if not fts_select_cols:
         file_name = sub_name + '_COLS.txt'
+    elif woe_trf:
+        file_name = sub_name + '_COLS_woe.txt'
     else:
         file_name = sub_name + '_COLS_sfm.txt'
     with open(file_name, 'w') as file:
@@ -440,7 +463,8 @@ def train_tbl(df_train, df_labels,
               verbose:bool=False,
               test_sam:bool=False,
               fts_select_cols:dict=None,
-              early_stopping:bool=False):
+              early_stopping:bool=False,
+              woe_trf:bool=False):
     """
     Train tabular data. The training is done on CV and full dataset.
 
@@ -471,16 +495,22 @@ def train_tbl(df_train, df_labels,
                                   verbose=verbose,
                                   target_encode_fts=target_encode_fts,
                                   fts_select_cols=fts_select_cols,
-                                  early_stopping=early_stopping)
+                                  early_stopping=early_stopping,
+                                  woe_trf=woe_trf)
     
     train_cv_loss_df = pd.DataFrame.from_dict(train_cv_loss, orient='index')
     if fts_select_cols:
         train_cv_loss_df.columns = [sub_name + '_sfm']
+    elif woe_trf:
+        train_cv_loss_df.columns = [sub_name + '_woe']
     else:
         train_cv_loss_df.columns = [sub_name]
     train_cv_loss_df.index = train_cv_loss_df.index.set_names('target')
     if fts_select_cols:
         train_cv_loss_df.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_sfm_cvloss.csv'),
+                                index=True)
+    elif woe_trf:
+        train_cv_loss_df.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_woe_cvloss.csv'),
                                 index=True)
     else:
         train_cv_loss_df.to_csv(os.path.join(config.MODELS_DIR, sub_name + '_cvloss.csv'),
@@ -498,11 +528,14 @@ def train_tbl(df_train, df_labels,
                                   target_encode=target_encode,
                                   target_encode_fts=target_encode_fts,
                                   test_sam=test_sam,
-                                  fts_select_cols=fts_select_cols)
+                                  fts_select_cols=fts_select_cols,
+                                  woe_trf=woe_trf)
 
     # Save submission file
     if fts_select_cols:
         submission.to_csv(config.MODELS_DIR + sub_name + '_sfm.csv')
+    elif woe_trf:
+        submission.to_csv(config.MODELS_DIR + sub_name + '_woe.csv')
     else:
         submission.to_csv(config.MODELS_DIR + sub_name + '.csv')
 

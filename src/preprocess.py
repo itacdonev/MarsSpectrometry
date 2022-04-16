@@ -230,7 +230,7 @@ def preprocess_samples(df,
     return df
 
 
-def compute_min_max_temp_ion(metadata):
+def compute_min_max_temp_ion(metadata, detrend_method):
     """
     Compute min and max temperature for all samples.
     Compute unique values for the ion type.
@@ -244,7 +244,7 @@ def compute_min_max_temp_ion(metadata):
         df_sample = preprocess.get_sample(metadata, i)
         
         # Preprocess the sample data
-        df_sample = preprocess_samples(df_sample)
+        df_sample = preprocess_samples(df_sample, detrend_method)
         
         # Get the temp values
         if df_sample.temp.min() < min_temp:
@@ -260,7 +260,7 @@ def compute_min_max_temp_ion(metadata):
         
     return min_temp, max_temp, ion_list
 
-def compute_max_time_samples(metadata):
+def compute_max_time_samples(metadata,detrend_method,smooth):
     """
     Compute maximum time across all samples in
     training, validation and test sets.
@@ -271,7 +271,7 @@ def compute_max_time_samples(metadata):
     for i in tqdm(range(metadata.shape[0])):
         # Load the sample
         df_sample = preprocess.get_sample(metadata, i)
-        df_sample = preprocess.preprocess_samples(df_sample)
+        df_sample = preprocess.preprocess_samples(df_sample, detrend_method,smooth)
         
         # Compute maximum time within the sample
         tm = df_sample.time.max()

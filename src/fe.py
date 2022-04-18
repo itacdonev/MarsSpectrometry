@@ -334,7 +334,7 @@ class CreateFeatures:
 
             # Number of carbons
             #TODO Needs correction if there are present 1st and 2nd isotopes
-            temp['C_cnt'] = features.get_no_carbons(df_sample)            
+            temp['C_cnt'] = features.get_no_carbons(df_sample)
 
             # Presence of nitrogen
             # an even molecular ion indicates the sample lacks nitrogen
